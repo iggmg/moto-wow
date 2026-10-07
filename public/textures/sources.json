@@ -1,0 +1,133 @@
+[
+  {
+    "id": "mud_forest",
+    "source": "https://polyhaven.com/a/mud_forest",
+    "license": "CC0-1.0",
+    "files": [
+      {
+        "path": "mud_forest-color.jpg",
+        "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/mud_forest/mud_forest_diff_1k.jpg",
+        "md5": "d3ea8fc962bbf54d66fc5723cd0096c1"
+      },
+      {
+        "path": "mud_forest-normal.jpg",
+        "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/mud_forest/mud_forest_nor_gl_1k.jpg",
+        "md5": "6e2f0d15fdf402ca5221f63d0bfbeb60"
+      },
+      {
+        "path": "mud_forest-roughness.jpg",
+        "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/mud_forest/mud_forest_rough_1k.jpg",
+        "md5": "7e8295bca2f2e7fe13c09b9ab0d6f67d"
+      }
+    ],
+    "authors": {
+      "eye-candy.xyz": "All"
+    },
+    "name": "Mud Forest"
+  },
+  {
+    "id": "forest_floor",
+    "source": "https://polyhaven.com/a/forest_floor",
+    "license": "CC0-1.0",
+    "files": [
+      {
+        "path": "forest_floor-color.jpg",
+        "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/forest_floor/forest_floor_diff_1k.jpg",
+        "md5": "d67f308e4b8be6a65989e8dc76ec40fe"
+      },
+      {
+        "path": "forest_floor-normal.jpg",
+        "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/forest_floor/forest_floor_nor_gl_1k.jpg",
+        "md5": "7cb480d082527766acdf3b6c8cba50f4"
+      },
+      {
+        "path": "forest_floor-roughness.jpg",
+        "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/forest_floor/forest_floor_rough_1k.jpg",
+        "md5": "446092b42424c7bcf15994d651949546"
+      }
+    ],
+    "authors": {
+      "eye-candy.xyz": "All"
+    },
+    "name": "Forest Floor"
+  },
+  {
+    "id": "bark_brown_01",
+    "source": "https://polyhaven.com/a/bark_brown_01",
+    "license": "CC0-1.0",
+    "files": [
+      {
+        "path": "bark_brown_01-color.jpg",
+        "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/bark_brown_01/bark_brown_01_diff_1k.jpg",
+        "md5": "b6d5dcde10b7cd1b36d70cd33a34724a"
+      },
+      {
+        "path": "bark_brown_01-normal.jpg",
+        "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/bark_brown_01/bark_brown_01_nor_gl_1k.jpg",
+        "md5": "8ae9907be7ce562c11aab619615d30d4"
+      },
+      {
+        "path": "bark_brown_01-roughness.jpg",
+        "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/bark_brown_01/bark_brown_01_rough_1k.jpg",
+        "md5": "b7a1aa42ecf0b30aba7f587769d13910"
+      }
+    ],
+    "authors": {
+      "Rob Tuytel": "All"
+    },
+    "name": "Bark Brown 01"
+  },
+  {
+    "id": "rock_boulder_dry",
+    "source": "https://polyhaven.com/a/rock_boulder_dry",
+    "license": "CC0-1.0",
+    "files": [
+      {
+        "path": "rock_boulder_dry-color.jpg",
+        "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/rock_boulder_dry/rock_boulder_dry_diff_1k.jpg",
+        "md5": "da794cd9be3db91e3160cf081109f322"
+      },
+      {
+        "path": "rock_boulder_dry-normal.jpg",
+        "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/rock_boulder_dry/rock_boulder_dry_nor_gl_1k.jpg",
+        "md5": "6f1c575ceed560ae253f65518cf748e2"
+      },
+      {
+        "path": "rock_boulder_dry-roughness.jpg",
+        "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/rock_boulder_dry/rock_boulder_dry_rough_1k.jpg",
+        "md5": "0c8b15df3e31c15256da5f8e1b0d0759"
+      }
+    ],
+    "authors": {
+      "Dimitrios Savva": "Photography",
+      "Rico Cilliers": "Processing"
+    },
+    "name": "Rock Boulder Dry"
+  },
+  {
+    "id": "gravelly_sand",
+    "source": "https://polyhaven.com/a/gravelly_sand",
+    "license": "CC0-1.0",
+    "files": [
+      {
+        "path": "gravelly_sand-color.jpg",
+        "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/gravelly_sand/gravelly_sand_diff_1k.jpg",
+        "md5": "16b7593a26ce1bd43f1d95e61dc25f05"
+      },
+      {
+        "path": "gravelly_sand-normal.jpg",
+        "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/gravelly_sand/gravelly_sand_nor_gl_1k.jpg",
+        "md5": "92053a3e135c938def2dc974c76e3763"
+      },
+      {
+        "path": "gravelly_sand-roughness.jpg",
+        "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/gravelly_sand/gravelly_sand_rough_1k.jpg",
+        "md5": "1152ab34b85ec42a5d4d6c8ed2c1100b"
+      }
+    ],
+    "authors": {
+      "Dario Barresi": "All"
+    },
+    "name": "Gravelly Sand"
+  }
+]

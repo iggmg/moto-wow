@@ -1,0 +1,50 @@
+{
+  "cub": {
+    "file": "cub.glb",
+    "author": "Moto Rift project",
+    "license": "MIT",
+    "kind": "original-approximation",
+    "units": "meters",
+    "forward": "+Z"
+  },
+  "exciter": {
+    "file": "exciter.glb",
+    "author": "Moto Rift project",
+    "license": "MIT",
+    "kind": "original-approximation",
+    "units": "meters",
+    "forward": "+Z"
+  },
+  "himalayan": {
+    "file": "himalayan.glb",
+    "author": "Moto Rift project",
+    "license": "MIT",
+    "kind": "original-approximation",
+    "units": "meters",
+    "forward": "+Z"
+  },
+  "winner": {
+    "file": "winner.glb",
+    "author": "Moto Rift project",
+    "license": "MIT",
+    "kind": "original-approximation",
+    "units": "meters",
+    "forward": "+Z"
+  },
+  "pcx": {
+    "file": "pcx.glb",
+    "author": "Moto Rift project",
+    "license": "MIT",
+    "kind": "original-approximation",
+    "units": "meters",
+    "forward": "+Z"
+  },
+  "mt07": {
+    "file": "mt07.glb",
+    "author": "Moto Rift project",
+    "license": "MIT",
+    "kind": "original-approximation",
+    "units": "meters",
+    "forward": "+Z"
+  }
+}

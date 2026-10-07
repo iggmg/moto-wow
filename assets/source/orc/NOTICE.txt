@@ -1,0 +1,12 @@
+Orc (3D) by Guillaume "GuieA_7" Englert
+Source: https://opengameart.org/content/orc-3d
+Original archive: https://opengameart.org/sites/default/files/orc.zip
+License: Creative Commons Attribution-ShareAlike 4.0 International
+https://creativecommons.org/licenses/by-sa/4.0/
+
+Modifications by Moto Rift: legacy Blender material conversion to PBR,
+texture embedding and baked animation export to glTF/GLB; in-game
+normalization and equipment attachments. The original source archive is
+retained in assets/source/orc/orc.zip. The imported model and adaptations
+remain CC BY-SA 4.0. This does not change the MIT license of game code.
+No Blizzard/Warcraft assets are used.

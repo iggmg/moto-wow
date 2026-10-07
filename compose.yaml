@@ -1,0 +1,25 @@
+services:
+  game:
+    build: .
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    tmpfs: [/tmp]
+    mem_limit: 512m
+    cpus: 1.0
+    ports:
+      - "127.0.0.1:8787:8787"
+    environment:
+      PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:?Set the exact public frontend origin}
+      DATABASE_PATH: /data/moto-wow.sqlite
+      COOKIE_SECURE: "1"
+    volumes:
+      - moto-data:/data
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8787/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+volumes:
+  moto-data:

@@ -1,0 +1,11 @@
+{
+  "title": "Orc (3D)",
+  "author": "Guillaume \"GuieA_7\" Englert",
+  "source": "https://opengameart.org/content/orc-3d",
+  "download": "https://opengameart.org/sites/default/files/orc.zip",
+  "license": "CC-BY-SA-4.0",
+  "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
+  "sourceSha256": "2a9d929c49c2f9079e628f198e8ee81df80920c72957ea34a73f745f6d654870",
+  "modelSha256": "c2f0ad44cd5cdb8fb0e44457bf3e3411519d8b82a96593a77c18f9cb9f66e7c7",
+  "modifications": "PBR material conversion, embedded textures, baked glTF animations; in-game scale/ground normalization and weapon attachments."
+}

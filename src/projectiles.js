@@ -1,0 +1,6 @@
+import * as T from 'three';
+import { add,tube,mat } from './model-geometry.js';
+export function createProjectileView(scene){const models=new Map(),axis=new T.Vector3(0,0,1);
+ function create(type){const g=new T.Group();if(type==='stone')add(g,new T.DodecahedronGeometry(.13,1),mat(0x777971,0,.94));else{const length=type==='spear'?1.65:.72;tube(g,[0,0,-length/2],[0,0,length/2],type==='spear'?.018:.009,mat(0x8a653c));const head=add(g,new T.ConeGeometry(type==='spear'?.06:.027,type==='spear'?.22:.09,4),mat(0x929b9e,.8,.35),0,0,length/2);head.rotation.x=Math.PI/2;if(type==='arrow')for(let i=0;i<3;i++){const feather=add(g,new T.PlaneGeometry(.05,.16),mat(0xc4a37f),0,0,-length/2+.1);feather.rotation.y=i*Math.PI*2/3;}}scene.add(g);return g;}
+ return {models,update(projectiles){const ids=new Set();for(const p of projectiles){ids.add(p.id);let g=models.get(p.id);if(!g){g=create(p.type);models.set(p.id,g);}g.position.set(p.x,p.y,p.z);if(p.type==='stone')g.rotation.set(p.life*4,p.life*3,0);else g.quaternion.setFromUnitVectors(axis,new T.Vector3(p.vx,p.vy,p.vz).normalize());}for(const [id,g]of models)if(!ids.has(id)){scene.remove(g);g.traverse(o=>{if(o.isMesh)o.geometry.dispose();});models.delete(id);}},clear(){this.update([]);}};
+}

@@ -1,0 +1,3 @@
+import { chromium } from '@playwright/test';
+const browser=await chromium.launch({executablePath:'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',args:['--enable-webgl','--use-angle=metal']});
+try{const page=await browser.newPage();await page.goto('http://127.0.0.1:5173/');await page.waitForFunction(()=>window.__motoRace?.world.orcs.every(o=>o.model.userData.loaded));console.log(JSON.stringify(await page.evaluate(()=>window.__motoRace.world.orcs.map(({model,data})=>{const bones=[];model.traverse(o=>{if(o.name.toLowerCase().includes('wrist'))bones.push({name:o.name,children:o.children.map(c=>({name:c.name,type:c.type,count:c.children.length}))});});return {id:data.id,scale:model.userData.scale,bones};}))));}finally{await browser.close();}
