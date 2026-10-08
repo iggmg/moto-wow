@@ -1,5 +1,6 @@
+import { friendlyTo,strikeOrc } from './arcade.js';
 import { damageRider } from './health.js';
-export const VERSION = 7;
+export const VERSION = 8;
 export const STEP = 1 / 60;
 import {DEFAULT_TRACK,PHYSICS_VERSION,CHECKPOINTS,trackData,trackById,trackPoint,trackHeading,groundHeight,baseHeight,rampAt,featureCoords,surfaceAt,ORCS} from './tracks.js';
 export * from './tracks.js';
@@ -27,14 +28,14 @@ export function createOrcs(time=0,trackId=DEFAULT_TRACK) {
 export function stepOrcs(orcs,riders,dt=STEP,time=0) {
   for(const orc of orcs) {
     const home=trackData(orc.trackId).ORCS[orc.id];
-    let target=riders.find(r=>r.id===orc.targetId&&r.health!==0&&!r.finished);
+    let target=riders.find(r=>r.id===orc.targetId&&r.health!==0&&!r.finished&&!friendlyTo(orc,r.id,time));
     const distance=r=>Math.hypot(r.x-orc.x,r.z-orc.z);
     if(!target||distance(target)>100||Math.hypot(orc.x-home.x,orc.z-home.z)>110)target=null;
     if(!target) {
       let nearest=Infinity;
       for(const rider of riders) {
-        if(rider.health===0||rider.finished)continue;
-        const d=distance(rider),alert=rider.speed<1?90:36;
+        if(rider.health===0||rider.finished||friendlyTo(orc,rider.id,time))continue;
+        const d=distance(rider),alert=rider.arcade?.huntUntil>time?100:rider.speed<1?90:36;
         if(d<alert&&d<nearest&&Math.hypot(rider.x-home.x,rider.z-home.z)<110){target=rider;nearest=d;}
       }
     }
@@ -56,12 +57,12 @@ export function stepOrcs(orcs,riders,dt=STEP,time=0) {
 }
 export function createRider(bike='cub',slot=0,trackId=DEFAULT_TRACK) {
   trackId=trackById(trackId).id;const p=trackPoint(0,trackId),yaw=trackHeading(0,trackId),offset=(slot%4-1.5)*2;
-  return {trackId,trackRevision:trackById(trackId).revision,physicsVersion:PHYSICS_VERSION,health:100,lastDamage:null,finished:false,raceTime:0,totalPenalty:0,lapLimit:0,bike,x:p.x+Math.cos(yaw)*offset,z:p.z-Math.sin(yaw)*offset-(Math.floor(slot/4)*3),yaw,speed:0,steer:0,y:groundHeight(p.x,p.z,trackId),vy:0,nextGate:1,lap:1,lapTime:0,best:0,last:0,hits:0,hitCooldown:0,surface:'dirt',distance:0,completed:0,penalty:0,airborne:false,lastRamp:null};
+  return {trackId,trackRevision:trackById(trackId).revision,physicsVersion:PHYSICS_VERSION,contactShield:2,contactVX:0,contactVZ:0,health:100,lastDamage:null,finished:false,raceTime:0,totalPenalty:0,lapLimit:0,bike,x:p.x+Math.cos(yaw)*offset,z:p.z-Math.sin(yaw)*offset-(Math.floor(slot/4)*3),yaw,speed:0,steer:0,y:groundHeight(p.x,p.z,trackId),vy:0,nextGate:1,lap:1,lapTime:0,best:0,last:0,hits:0,hitCooldown:0,surface:'dirt',distance:0,completed:0,penalty:0,airborne:false,lastRamp:null};
 }
 export function resetRider(s) {
   if(s.health===0||s.finished)return;
   const gate=Math.max(0,s.nextGate-1),t=gate/CHECKPOINTS,p=trackPoint(t,s.trackId);
-  s.x=p.x;s.z=p.z;s.yaw=trackHeading(t,s.trackId);s.speed=0;s.y=groundHeight(p.x,p.z,s.trackId);s.vy=0;s.airborne=false;s.lastRamp=null;s.penalty+=5;s.totalPenalty=(s.totalPenalty||0)+5;
+  if(s.arcade&&s.arcade.fuel===0)s.arcade.fuel=20;s.contactShield=2;s.contactVX=0;s.contactVZ=0;s.x=p.x;s.z=p.z;s.yaw=trackHeading(t,s.trackId);s.speed=0;s.y=groundHeight(p.x,p.z,s.trackId);s.vy=0;s.airborne=false;s.lastRamp=null;s.penalty+=5;s.totalPenalty=(s.totalPenalty||0)+5;
 }
 export function normalizeInput(input={}) {
   if(!input||typeof input!=='object')input={};
@@ -69,19 +70,20 @@ export function normalizeInput(input={}) {
 }
 export function stepRider(s,rawInput,dt=STEP,time=0,orcs=null,weather='clear') {
   if(s.health===0||s.finished){s.speed=0;return null;}
-  s.raceTime=(s.raceTime||0)+dt;
+  s.raceTime=(s.raceTime||0)+dt;s.contactShield=Math.max(0,(s.contactShield||0)-dt);
   const {GATES,RAMPS,ORCS,OBSTACLES}=trackData(s.trackId);
   const input=normalizeInput(rawInput),bike=bikeById(s.bike),surface=surfaceAt(s.x,s.z,weather,s.trackId);
   s.surface=surface.name;s.hitCooldown=Math.max(0,s.hitCooldown-dt);s.lapTime+=dt;
   const baseGrip={mud:bike.mudGrip,grass:.43,sand:.62,water:.48,snow:.45}[surface.name]??1;
-  const grip=baseGrip*(weather==='rain'?.80:1),drag={mud:1.5,grass:2.5,sand:1.6,water:2.2,snow:1.1}[surface.name]||0;
-  const max=bike.maxSpeed*({mud:.53+grip*.3,grass:.5,sand:.7,water:.55,snow:.68}[surface.name]??1);
+  const slip=s.arcade?.slipUntil>time,boost=s.arcade?.boostUntil>time;const grip=baseGrip*(slip?.32:1)*(weather==='rain'?.80:1),drag={mud:1.5,grass:2.5,sand:1.6,water:2.2,snow:1.1}[surface.name]||0;
+  const max=(s.arcade?.fuel===0?6:bike.maxSpeed*(boost?1.22:1))*({mud:.53+grip*.3,grass:.5,sand:.7,water:.55,snow:.68}[surface.name]??1);
   const resistance=.3+s.speed*s.speed*.004+drag;
-  s.speed=clamp(s.speed+(input.throttle*bike.acceleration*grip-input.brake*14-resistance)*dt,0,max);
+  s.speed=clamp(s.speed+(input.throttle*bike.acceleration*grip*(boost?1.8:1)-input.brake*14-resistance)*dt,0,max);
   s.steer+=(input.steer-s.steer)*Math.min(1,dt*7*grip);
   s.yaw-=s.steer*(s.airborne?.15:1)*bike.handling*(.35+s.speed*.042)/(1+s.speed*.018)*dt*grip;
+  if(slip&&!s.airborne)s.yaw+=Math.sin(time*5+s.id)*s.speed*.015*dt;
   const dx=Math.sin(s.yaw)*s.speed*dt,dz=Math.cos(s.yaw)*s.speed*dt;
-  s.x+=dx;s.z+=dz;s.distance+=Math.hypot(dx,dz);
+  s.x+=dx+(s.contactVX||0)*dt;s.z+=dz+(s.contactVZ||0)*dt;s.contactVX=(s.contactVX||0)*Math.exp(-dt*6);s.contactVZ=(s.contactVZ||0)*Math.exp(-dt*6);s.distance+=Math.hypot(dx,dz);
   s.x=clamp(s.x,-220,220);s.z=clamp(s.z,-180,180);
   const gy=groundHeight(s.x,s.z,s.trackId),ramp=rampAt(s.x,s.z,s.trackId);
   const hill=baseHeight(s.x+Math.sin(s.yaw),s.z+Math.cos(s.yaw),s.trackId)-baseHeight(s.x,s.z,s.trackId);
@@ -97,7 +99,8 @@ export function stepRider(s,rawInput,dt=STEP,time=0,orcs=null,weather='clear') {
   if(s.hitCooldown<=0&&!s.airborne) {
     const enemies=orcs||ORCS.map(o=>orcPosition(o,time));
     const obstacle=OBSTACLES.find(o=>Math.hypot(o.x-s.x,o.z-s.z)<o.radius+.5),enemy=enemies.find(o=>Math.hypot(o.x-s.x,o.z-s.z)<1.4);
-    if(enemy||obstacle&&s.speed>1){damageRider(s,enemy?'melee':obstacle.type,s.speed);s.speed*=.5;if(s.health>0){s.vy=1.3;s.airborne=true;}}
+    if(enemy&&s.arcade&&s.speed>=6)strikeOrc(s,enemy,enemies,time);
+    if(enemy&&!friendlyTo(enemy,s.id,time)||obstacle&&s.speed>1){damageRider(s,enemy?'melee':obstacle.type,s.speed);s.speed*=.5;if(s.health>0){s.vy=1.3;s.airborne=true;}}
   }
   if(s.health===0)return null;
   const gate=GATES[s.nextGate%CHECKPOINTS];

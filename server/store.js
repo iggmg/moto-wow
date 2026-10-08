@@ -1,3 +1,4 @@
+import {SEASON,medalFor,rankChampionship} from '../shared/championship.js';
 import { DatabaseSync } from 'node:sqlite';
 import { randomBytes, scrypt as scryptCb, timingSafeEqual, createHash } from 'node:crypto';
 import { promisify } from 'node:util';
@@ -18,8 +19,9 @@ export function createStore(path) {
     CREATE INDEX IF NOT EXISTS lap_user_bike ON laps(user_id,bike,seconds);`);
   // Preserve old records as version 5; new courses/rules never share a ranking.
   const columns=new Set(db.prepare('PRAGMA table_info(laps)').all().map(c=>c.name));
-  for(const [name,definition]of Object.entries({track:"TEXT NOT NULL DEFAULT 'rift'",revision:'INTEGER NOT NULL DEFAULT 1',physics:'INTEGER NOT NULL DEFAULT 5',mode:"TEXT NOT NULL DEFAULT 'legacy'",weather:"TEXT NOT NULL DEFAULT 'clear'"}))if(!columns.has(name))db.exec(`ALTER TABLE laps ADD COLUMN ${name} ${definition}`);
+  for(const [name,definition]of Object.entries({track:"TEXT NOT NULL DEFAULT 'rift'",revision:'INTEGER NOT NULL DEFAULT 1',physics:'INTEGER NOT NULL DEFAULT 5',mode:"TEXT NOT NULL DEFAULT 'legacy'",weather:"TEXT NOT NULL DEFAULT 'clear'",score:'INTEGER NOT NULL DEFAULT 0'}))if(!columns.has(name))db.exec(`ALTER TABLE laps ADD COLUMN ${name} ${definition}`);
   db.exec('CREATE INDEX IF NOT EXISTS lap_context ON laps(track,revision,physics,mode,weather,bike,seconds)');
+  db.exec(`CREATE TABLE IF NOT EXISTS championship (season TEXT NOT NULL,user_id INTEGER NOT NULL REFERENCES users(id),event TEXT NOT NULL,bike TEXT NOT NULL,seconds REAL NOT NULL,points INTEGER NOT NULL,medal TEXT NOT NULL,ratio REAL NOT NULL,PRIMARY KEY(season,user_id,event));`);
   const publicUser=u=>({id:u.id,nickname:u.nickname});
   function issueSession(user){db.prepare('DELETE FROM sessions WHERE user_id=? AND token NOT IN (SELECT token FROM sessions WHERE user_id=? ORDER BY expires DESC LIMIT 4)').run(user.id,user.id);const token=randomBytes(32).toString('hex');db.prepare('INSERT INTO sessions VALUES(?,?,?)').run(digest(token),user.id,Date.now()+7*86400000);return {user:publicUser(user),token};}
   return {
@@ -40,9 +42,11 @@ export function createStore(path) {
     },
     session(token) {if(typeof token!=='string'||token.length!==64)return null;const u=db.prepare('SELECT u.id,u.nickname FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token=? AND s.expires>?').get(digest(token),Date.now());return u?publicUser(u):null;},
     logout(token){if(token)db.prepare('DELETE FROM sessions WHERE token=?').run(digest(token));},
-    record(userId,bike,seconds,c={}){const v=context(c);db.prepare('INSERT INTO laps(user_id,bike,seconds,track,revision,physics,mode,weather) VALUES(?,?,?,?,?,?,?,?)').run(userId,bike,seconds,...values(v));},
-    leaderboard(bike,c={}){const v=context(c);return db.prepare(`SELECT u.nickname,l.bike,MIN(l.seconds) seconds,COUNT(*) laps FROM laps l JOIN users u ON u.id=l.user_id WHERE l.track=? AND l.revision=? AND l.physics=? AND l.mode=? AND l.weather=? ${bike?'AND l.bike=?':''} GROUP BY l.user_id,l.bike ORDER BY seconds ASC LIMIT 50`).all(...values(v),...(bike?[bike]:[]));},
+    record(userId,bike,seconds,c={}){const v=context(c);db.prepare('INSERT INTO laps(user_id,bike,seconds,track,revision,physics,mode,weather,score) VALUES(?,?,?,?,?,?,?,?,?)').run(userId,bike,seconds,...values(v),Math.max(0,Math.floor(c.score||0)));},
+    leaderboard(bike,c={}){const v=context(c);return db.prepare(`SELECT u.nickname,l.bike,MIN(l.seconds) seconds,COUNT(*) laps,MAX(l.score) score FROM laps l JOIN users u ON u.id=l.user_id WHERE l.track=? AND l.revision=? AND l.physics=? AND l.mode=? AND l.weather=? ${bike?'AND l.bike=?':''} GROUP BY l.user_id,l.bike ORDER BY seconds ASC LIMIT 50`).all(...values(v),...(bike?[bike]:[]));},
     stats(userId,c={}){const v=context(c);return db.prepare('SELECT bike,MIN(seconds) best,COUNT(*) laps FROM laps WHERE user_id=? AND track=? AND revision=? AND physics=? AND mode=? AND weather=? GROUP BY bike').all(userId,...values(v));},
+    award(userId,event,bike,seconds){const award=medalFor(event,bike,seconds);if(!award)return null;db.prepare('INSERT INTO championship VALUES(?,?,?,?,?,?,?,?) ON CONFLICT(season,user_id,event) DO UPDATE SET bike=excluded.bike,seconds=excluded.seconds,points=excluded.points,medal=excluded.medal,ratio=excluded.ratio WHERE excluded.points>championship.points OR excluded.points=championship.points AND excluded.ratio<championship.ratio').run(SEASON,userId,event,bike,seconds,award.points,award.medal,award.ratio);return award;},
+    championship(userId=null,event=null){const rows=db.prepare(`SELECT c.user_id AS id,u.nickname,SUM(c.points) points,COUNT(*) events FROM championship c JOIN users u ON u.id=c.user_id WHERE c.season=? ${event?'AND c.event=?':''} GROUP BY c.user_id ORDER BY points DESC,u.nickname COLLATE NOCASE`).all(SEASON,...(event?[event]:[]));const ranked=rankChampionship(rows);return {entries:ranked.slice(0,100).map(({id,...r})=>({...r,you:id===userId})),self:ranked.find(r=>r.id===userId)?(({id,...r})=>r)(ranked.find(r=>r.id===userId)):null,awards:userId?db.prepare('SELECT event,bike,seconds,points,medal FROM championship WHERE season=? AND user_id=?').all(SEASON,userId):[]};},
     cleanup(){db.prepare('DELETE FROM sessions WHERE expires<?').run(Date.now());},
     close(){db.close();}
   };

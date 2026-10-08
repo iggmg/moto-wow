@@ -1,11 +1,19 @@
+import { MusicPlayer, MUSIC_TRACKS } from './music.js';
 // All sounds are synthesized locally. Starting/resuming happens in a user gesture.
 export class RaceAudio {
-  constructor(){this.enabled=localStorage.getItem('moto-sound')!=='off';}
+  constructor(){
+    let saved={};try{saved=JSON.parse(localStorage.getItem('moto-audio')||'{}')||{};}catch{}
+    this.settings={effects:saved.effects??localStorage.getItem('moto-sound')!=='off',music:saved.music!==false,track:MUSIC_TRACKS[saved.track]?saved.track:'arcade',effectsVolume:Number.isFinite(saved.effectsVolume)?Math.max(0,Math.min(1,saved.effectsVolume)):.65,musicVolume:Number.isFinite(saved.musicVolume)?Math.max(0,Math.min(1,saved.musicVolume)):.35};
+    this.enabled=this.settings.effects;this.active=false;
+    document.addEventListener('visibilitychange',()=>{if(document.hidden){this.music?.stop();this.silence();this.context?.suspend();}else this.context?.resume().catch(()=>{});});
+  }
+  configure(changes){Object.assign(this.settings,changes);this.enabled=this.settings.effects;localStorage.setItem('moto-audio',JSON.stringify(this.settings));localStorage.setItem('moto-sound',this.enabled?'on':'off');if(this.master)this.master.gain.setTargetAtTime(this.enabled?this.settings.effectsVolume:0,this.context.currentTime,.08);this.music?.set({enabled:this.settings.music,track:this.settings.track,volume:this.settings.musicVolume,active:this.active&&!document.hidden});}
+
   unlock(){
-    if(!this.enabled)return;
+
     if(this.context){this.context.resume();return;}
     const Audio=window.AudioContext||window.webkitAudioContext;if(!Audio)return;
-    const c=this.context=new Audio();this.master=c.createGain();this.master.gain.value=.65;
+    const c=this.context=new Audio();this.master=c.createGain();this.master.gain.value=this.enabled?this.settings.effectsVolume:0;this.music=new MusicPlayer(c,c.destination);
     this.analyser=c.createAnalyser();this.analyser.fftSize=512;this.master.connect(this.analyser);this.analyser.connect(c.destination);
     const real=new Float32Array(24),imag=new Float32Array(24);
     for(let i=1;i<24;i++)imag[i]=(i%2?.9:.36)/Math.pow(i,.9);
@@ -22,10 +30,10 @@ export class RaceAudio {
     this.windGain=c.createGain();this.windGain.gain.value=0;this.noise.connect(this.windFilter);this.windFilter.connect(this.windGain);this.windGain.connect(this.master);this.noise.start();
     this.lastHits=0;c.resume();
   }
-  toggle(){this.enabled=!this.enabled;localStorage.setItem('moto-sound',this.enabled?'on':'off');if(this.enabled)this.unlock();else this.silence();return this.enabled;}
+  toggle(){this.unlock();this.configure({effects:!this.enabled});if(!this.enabled)this.silence();return this.enabled;}
   silence(){if(!this.context)return;for(const g of [this.motorGain,this.mechanicsGain,this.roadGain,this.windGain])g.gain.setTargetAtTime(0,this.context.currentTime,.08);}
   update(state,input,time,running,weather='clear'){
-    if(!this.context)return;if(!running||!this.enabled){this.silence();return;}
+    this.active=running&&!state.finished;if(!this.context)return;const visible=!document.hidden;this.music.set({enabled:this.settings.music,track:this.settings.track,volume:this.settings.musicVolume,active:this.active&&visible});if(!visible||!running||!this.enabled){this.silence();return;}
     const c=this.context,t=c.currentTime,speed=state.speed,load=input.throttle||0;
     const scooter=state.bike==='pcx',adventure=state.bike==='himalayan';
     const gear=Math.min(5,1+Math.floor(speed/(scooter?40:6.3)));

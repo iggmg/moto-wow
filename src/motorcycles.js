@@ -32,7 +32,13 @@ function engine(g,b){
  const big=b.class==='naked'||b.class==='adventure',y=big?.49:.40,z=big?-.02:-.13;
  roundCase(g,0,y,z,big?.16:.115,big?.35:.25,steel);
  for(const side of [-1,1]){roundCase(g,side*(big?.19:.135),y,z,big?.115:.086,.012,black);for(let i=0;i<7;i++){const a=i/7*6.283;bolt(g,side*(big?.20:.145),y+Math.sin(a)*(big?.145:.10),z+Math.cos(a)*(big?.145:.10));}}
- if(b.class==='scooter')return;
+ if(b.class==='scooter'){
+  // PCX has an enclosed rear CVT drive and a visible right-hand silencer.
+  profile(g,[[-.75,.23],[-.20,.25],[-.12,.38],[-.37,.46],[-.70,.43]],.14,black).position.x=-.10;
+  curvedTube(g,[[.16,.32,-.13],[.20,.27,-.35],[.23,.29,-.54]],.022,bronze);
+  const muffler=tube(g,[.23,.28,-.34],[.28,.39,-.84],.07,black,24);tube(g,[.245,.285,-.35],[.30,.40,-.85],.045,chrome,24);
+  for(const z of [-.46,-.70])bolt(g,.31,.34,z);return;
+ }
  for(let cylinder=0;cylinder<(b.class==='naked'?2:1);cylinder++){
   const x=b.class==='naked'?(cylinder-.5)*.15:0;
   const block=box(g,x,y+.18,z+.09,big?.14:.15,big?.22:.14,.17,black);block.rotation.x=-.15;

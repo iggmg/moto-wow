@@ -1,3 +1,4 @@
+import {friendlyTo} from './arcade.js';
 import { groundHeight,STEP } from './game.js';
 import { damageRider } from './health.js';
 export const WEAPONS=['arrow','spear','stone'];
@@ -7,7 +8,7 @@ export const hitRider=(rider,type='arrow')=>damageRider(rider,type);
 export function stepCombat(combat,orcs,riders,dt=STEP,time=0){
  for(const orc of orcs){
   orc.weapon=WEAPONS[orc.id%WEAPONS.length];orc.shotCooldown=Math.max(0,(orc.shotCooldown||0)-dt);
-  const target=riders.find(r=>r.id===orc.targetId&&r.health!==0&&!r.finished),cfg=specs[orc.weapon];
+  const target=riders.find(r=>r.id===orc.targetId&&r.health!==0&&!r.finished&&!friendlyTo(orc,r.id,time)),cfg=specs[orc.weapon];
   const d=target?Math.hypot(target.x-orc.x,target.z-orc.z):Infinity;
   if(!target||d<6||d>cfg.range){orc.windup=0;continue;}
   if(orc.shotCooldown>0)continue;
@@ -25,6 +26,7 @@ export function stepCombat(combat,orcs,riders,dt=STEP,time=0){
   const before={x:p.x,y:p.y,z:p.z};p.x+=p.vx*dt;p.z+=p.vz*dt;p.y+=p.vy*dt-.5*p.gravity*dt*dt;p.vy-=p.gravity*dt;p.life-=dt;
   let hit=false;
   for(const rider of riders){
+   if(friendlyTo(orcs.find(o=>o.id===p.owner)||{},rider.id,time))continue;
    // Swept collision avoids arrows skipping a rider at low render rates.
    const dx=p.x-before.x,dy=p.y-before.y,dz=p.z-before.z,l=dx*dx+dy*dy+dz*dz;
    const t=l?Math.max(0,Math.min(1,((rider.x-before.x)*dx+(rider.y+.85-before.y)*dy+(rider.z-before.z)*dz)/l)):0;

@@ -1,0 +1,17 @@
+import * as T from 'three';
+import {stuntLevel,stuntGround} from '../shared/stunt.js';
+import {treeGeometry,foliageTexture} from './world.js';
+export function createStuntView(scene,id){
+ const root=new T.Group();scene.add(root);const level=stuntLevel(id),loader=new T.TextureLoader(),textures=[];
+ function texture(name,kind){const t=loader.load(`${import.meta.env.BASE_URL}textures/${name}-${kind}.jpg`);t.wrapS=t.wrapT=T.RepeatWrapping;if(kind==='color')t.colorSpace=T.SRGBColorSpace;t.anisotropy=4;textures.push(t);return t;}
+ const stone=new T.MeshStandardMaterial({color:0x8ba08d,map:texture('rock_boulder_dry','color'),normalMap:texture('rock_boulder_dry','normal'),roughness:1}),edge=new T.MeshStandardMaterial({color:0xbdbaa2,map:texture('gravelly_sand','color'),roughness:1});
+ const top=[],walls=[],topUV=[],wallUV=[];
+ function quad(p,uv,vertices,coords){for(const i of [0,1,2,0,2,3]){vertices.push(...p[i]);coords.push(...uv[i]);}}
+ for(let x=0;x<level.finish+8;x+=.25){const a=stuntGround(x+.001,id),b=stuntGround(x+.249,id);if(!a||!b)continue;quad([[x,a.height,-2],[x+.25,b.height,-2],[x+.25,b.height,2],[x,a.height,2]],[[x,0],[x+.25,0],[x+.25,2],[x,2]],top,topUV);for(const z of [-2,2])quad([[x,-6,z],[x+.25,-6,z],[x+.25,b.height,z],[x,a.height,z]],[[x,-3],[x+.25,-3],[x+.25,b.height/2],[x,a.height/2]],walls,wallUV);}
+ for(const [points,uv,material]of [[top,topUV,edge],[walls,wallUV,stone]]){const geo=new T.BufferGeometry();geo.setAttribute('position',new T.Float32BufferAttribute(points,3));geo.setAttribute('uv',new T.Float32BufferAttribute(uv,2));geo.computeVertexNormals();material.side=T.DoubleSide;const mesh=new T.Mesh(geo,material);mesh.receiveShadow=true;root.add(mesh);}
+ const backdrop=new T.Mesh(new T.PlaneGeometry(level.finish+70,70),new T.MeshStandardMaterial({color:0x596e48,map:texture('forest_floor','color'),roughness:1}));backdrop.rotation.x=-Math.PI/2;backdrop.position.set(level.finish/2,-3,-40);backdrop.receiveShadow=true;root.add(backdrop);
+ const trunks=new T.InstancedMesh(treeGeometry(83),new T.MeshStandardMaterial({color:0x756348,map:texture('bark_brown_01','color'),roughness:1}),35),leaves=new T.InstancedMesh(new T.PlaneGeometry(1,1),new T.MeshStandardMaterial({color:0x84a67c,map:foliageTexture(),alphaTest:.5,side:T.DoubleSide,roughness:1}),35*24),dummy=new T.Object3D();root.add(trunks,leaves);textures.push(leaves.material.map);
+ for(let i=0;i<35;i++){const x=i*6-10,z=-14-(i%3)*5,scale=.7+(i%5)*.1;dummy.position.set(x,-3,z);dummy.scale.setScalar(scale);dummy.rotation.set(0,i*2.3,0);dummy.updateMatrix();trunks.setMatrixAt(i,dummy.matrix);for(let j=0;j<24;j++){const a=j*2.4;dummy.position.set(x+Math.cos(a)*(j%4),4+(j%7)*.7,z+Math.sin(a)*(j%4));dummy.scale.set(5*scale,4*scale,1);dummy.rotation.set(.2*Math.sin(j),j*2.1,0);dummy.updateMatrix();leaves.setMatrixAt(i*24+j,dummy.matrix);}}
+ for(const [i,x]of [...level.checkpoints,level.finish].entries()){const g=stuntGround(x,id),post=new T.Mesh(new T.CylinderGeometry(.08,.1,3,8),new T.MeshStandardMaterial({color:0xb4a47b}));post.position.set(x,(g?.height||0)+1.5,-1.8);root.add(post);const flag=new T.Mesh(new T.BoxGeometry(1.3,.8,.08),new T.MeshStandardMaterial({color:i===level.checkpoints.length?0xe7bd66:0x9875d6}));flag.position.set(x+.65,(g?.height||0)+2.7,-1.8);root.add(flag);}
+ return {root,dispose(){root.removeFromParent();const materials=new Set();root.traverse(o=>{o.geometry?.dispose();if(o.material)materials.add(o.material);});for(const m of materials)m.dispose();for(const t of textures)t.dispose();}};
+}

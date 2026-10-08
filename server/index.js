@@ -1,3 +1,6 @@
+import {SEASON,CHAMPIONSHIP_EVENTS} from '../shared/championship.js';
+import {createArcade,initArcade,stepArcade,feedOrc} from '../shared/arcade.js';
+import { stepContacts } from '../shared/contacts.js';
 import express from 'express';
 import { createServer } from 'node:http';
 import { randomBytes } from 'node:crypto';
@@ -43,12 +46,13 @@ export function createGameServer({database=process.env.DATABASE_PATH||'./data/mo
   app.get('/api/rooms',requireUser,(_req,res)=>res.json({rooms:[...rooms.values()].filter(r=>r.mode==='open'&&r.code.startsWith('OPEN-')).map(roomInfo)}));
   app.get('/api/auth/me',requireUser,(req,res)=>res.json({user:req.user,stats:store.stats(req.user.id)}));
   app.post('/api/auth/logout',requireUser,(req,res)=>{store.logout(tokenOf(req));cookie(res,'',0);for(const room of rooms.values())for(const p of room.players.values())if(p.user.id===req.user.id)p.ws.close(1000,'Logged out');res.json({ok:true});});
-  app.get('/api/leaderboard',(req,res)=>{const bike=typeof req.query.bike==='string'&&BIKES.some(b=>b.id===req.query.bike)?req.query.bike:null;const track=trackById(req.query.track),physics=['5','6'].includes(req.query.physics)?Number(req.query.physics):VERSION,mode=physics===5?'legacy':req.query.mode==='race'?'race':'open',weather=WEATHER.includes(req.query.weather)?req.query.weather:track.weather,context={trackId:track.id,trackRevision:physics<VERSION?1:track.revision,physicsVersion:physics,mode,weather};res.json({context,entries:store.leaderboard(bike,context)});});
+  app.get('/api/championship',(req,res)=>res.json({season:SEASON,events:CHAMPIONSHIP_EVENTS,...store.championship(store.session(tokenOf(req))?.id,CHAMPIONSHIP_EVENTS.some(e=>e.id===req.query.event)?req.query.event:null)}));
+  app.get('/api/leaderboard',(req,res)=>{const bike=typeof req.query.bike==='string'&&BIKES.some(b=>b.id===req.query.bike)?req.query.bike:null;const track=trackById(req.query.track),physics=['5','6','7'].includes(req.query.physics)?Number(req.query.physics):VERSION,mode=physics===5?'legacy':['race','arcade'].includes(req.query.mode)?req.query.mode:'open',weather=WEATHER.includes(req.query.weather)?req.query.weather:track.weather,context={trackId:track.id,trackRevision:physics<7?1:track.revision,physicsVersion:physics,mode,weather};res.json({context,entries:store.leaderboard(bike,context)});});
   app.post('/api/ws-ticket',requireUser,(req,res)=>{if(tickets.size>=1000)return res.status(503).json({error:'Сервер занят.'});for(const[k,t]of tickets)if(t.user.id===req.user.id)tickets.delete(k);const ticket=randomBytes(24).toString('hex');tickets.set(ticket,{user:req.user,token:tokenOf(req),expires:Date.now()+15000});res.json({ticket});});
   app.use('/api',(_req,res)=>res.status(404).json({error:'Неизвестный API маршрут.'}));
   app.use(express.static(resolve('dist'),{setHeaders:res=>{res.setHeader('Cache-Control','public, max-age=300');res.setHeader('Content-Security-Policy',"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' blob:; font-src 'self'; object-src 'none'; form-action 'self'; frame-src 'none'; frame-ancestors 'none'; base-uri 'self'");}}));
   app.use((err,_req,res,_next)=>{res.status(400).json({error:'Некорректный запрос.'});});
-  function snapshot(room){return {type:'state',time:room.time,race:roomInfo(room),weather:room.weather,combat:room.combat,orcs:room.orcs,players:[...room.players.values()].map(p=>({id:p.user.id,nickname:p.user.nickname,ack:p.seq,...p.state}))};}
+  function snapshot(room){return {type:'state',time:room.time,race:roomInfo(room),weather:room.weather,arcade:room.arcade,combat:room.combat,orcs:room.orcs,players:[...room.players.values()].map(p=>({id:p.user.id,nickname:p.user.nickname,ack:p.seq,...p.state}))};}
   function send(ws,value){if(ws.readyState===WebSocket.OPEN){if(ws.bufferedAmount>256*1024){ws.close(1013,'Slow connection');return;}ws.send(JSON.stringify(value));}}
   server.on('upgrade',(req,socket,head)=>{
     if(!allowed(req.headers.origin)){socket.destroy();return;}
@@ -80,14 +84,15 @@ export function createGameServer({database=process.env.DATABASE_PATH||'./data/mo
         for(const active of wss.clients)if(active!==ws&&active.userId===ticket.user.id)active.close(1000,'Joined from another tab');ws.userId=ticket.user.id;
         if(r.players.size>=8&&!old){send(ws,{type:'error',error:'В комнате уже 8 гонщиков.'});ws.close(1008);return;}
         if(old)old.ws.close(1000,'Joined from another tab');
-        room=r;player={ws,user:ticket.user,token:ticket.token,state:createRider(msg.bike,r.players.size,r.trackId),input:normalizeInput(),lastInput:Date.now(),seq:0};if(r.mode==='race')player.state.lapLimit=r.laps;player.state.best=store.stats(ticket.user.id,r).find(s=>s.bike===msg.bike)?.best||0;r.players.set(ticket.user.id,player);clearTimeout(joinTimer);
+        room=r;player={ws,user:ticket.user,token:ticket.token,state:createRider(msg.bike,r.players.size,r.trackId),input:normalizeInput(),lastInput:Date.now(),seq:0};player.state.id=ticket.user.id;if(r.mode==='arcade')initArcade(player.state);if(r.mode==='race')player.state.lapLimit=r.laps;player.state.best=store.stats(ticket.user.id,r).find(s=>s.bike===msg.bike)?.best||0;r.players.set(ticket.user.id,player);clearTimeout(joinTimer);
         send(ws,{type:'joined',id:ticket.user.id,room:code,version:VERSION,...snapshot(r),type:'joined'});return;
       }
       if(!player)return;
       if(msg.type==='input'&&Number.isSafeInteger(msg.seq)&&msg.seq>player.seq&&msg.seq-player.seq<=600&&['throttle','brake','steer'].every(k=>msg[k]===undefined||typeof msg[k]==='number'&&Number.isFinite(msg[k])&&Math.abs(msg[k])<=1)){player.input=normalizeInput(msg);player.lastInput=Date.now();player.seq=msg.seq;}
+      if(msg.type==='feed'&&room.mode==='arcade')feedOrc(player.state,room.orcs,room.combat,room.time);
       if(msg.type==='start')startRoom(room,player.user.id);
       if(msg.type==='lobby')returnToLobby(room,player.user.id);
-      if(msg.type==='respawn'&&room.mode==='open'&&player.state.health===0&&room.time-(player.state.finishedAt??room.time)>=5){const best=player.state.best;player.state=createRider(player.state.bike,0,room.trackId);player.state.best=best;player.input={};}
+      if(msg.type==='respawn'&&room.mode!=='race'&&player.state.health===0&&room.time-(player.state.finishedAt??room.time)>=5){const best=player.state.best;player.state=createRider(player.state.bike,0,room.trackId);player.state.id=player.user.id;if(room.mode==='arcade')initArcade(player.state);player.state.best=best;player.input={};}
       if(msg.type==='reset'&&(player.lastReset===undefined||Date.now()-player.lastReset>2000)){resetRider(player.state);player.lastReset=Date.now();}
     });
     ws.on('close',()=>{clearTimeout(joinTimer);if(room&&room.players.get(ticket.user.id)===player){room.players.delete(ticket.user.id);if(room.hostId===ticket.user.id)room.hostId=room.players.keys().next().value??null;if(!room.players.size)rooms.delete(room.code);}});
@@ -102,13 +107,15 @@ export function createGameServer({database=process.env.DATABASE_PATH||'./data/mo
         room.time+=STEP;
         if(room.phase==='countdown'&&room.time>=room.startAt)room.phase='racing';
         if(room.phase==='racing'){
+        if(room.arcade)stepArcade(room.arcade,[...room.players.values()].map(p=>p.state),room.orcs,room.combat,STEP,room.time);
         stepOrcs(room.orcs,[...room.players.values()].map(p=>({id:p.user.id,...p.state})),STEP,room.time);
         stepCombat(room.combat,room.orcs,[...room.players.values()].map(p=>Object.assign(p.state,{id:p.user.id})),STEP,room.time);
         for(const p of room.players.values()){
           const event=stepRider(p.state,Date.now()-p.lastInput>350?{}:p.input,STEP,room.time,room.orcs,room.weather);
           if(p.state.finished&&p.state.finishedAt===undefined){p.state.finishedAt=room.time;p.state.resultSeconds=p.state.raceTime+p.state.totalPenalty;}
-          if(event){store.record(p.user.id,event.bike,event.lap,{...event,mode:room.mode});send(p.ws,{type:'lap',seconds:event.lap,best:p.state.best});}
+          if(event){if(room.championship&&p.state.finished&&p.state.health>0){const award=store.award(p.user.id,room.trackId,p.state.bike,p.state.resultSeconds);send(p.ws,{type:'award',...award});}store.record(p.user.id,event.bike,event.lap,{...event,mode:room.mode,score:p.state.arcade?.score||0});send(p.ws,{type:'lap',seconds:event.lap,best:p.state.best});}
         }
+        stepContacts([...room.players.values()].map(p=>p.state),room.time,{damage:room.contactDamage});
         if(room.mode==='race'&&[...room.players.values()].every(p=>p.state.finished))room.phase='finished';
         }
         if(ticks%3===0){const msg=snapshot(room);for(const p of room.players.values())send(p.ws,msg);}

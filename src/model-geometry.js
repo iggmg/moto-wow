@@ -40,11 +40,11 @@ function riderModel(b){
  const back=ellipsoid(g,0,seatY+.35,-.41,.125,.17,.018,panels);back.rotation.x=.2;
  for(const side of [-1,1])curvedTube(g,[[side*.12,seatY+.52,-.33],[side*.10,seatY+.34,-.44],[side*.07,seatY+.18,-.39]],.009,trim);
  for(const side of [-1,1]){
-  const shoulder=[side*.21,seatY+.51,-.19],elbow=[side*.29,seatY+.29,.05],wrist=[side*.30,1.06,.34];
+  const shoulder=[side*.21,seatY+.51,-.19],elbow=[side*.29,seatY+.29,.05],wrist=[side*.30,(b.class==='adventure'?1.12:b.class==='naked'?1.04:b.id==='cub'?1:1.01)+.048,b.wheelbase/2-.20];
   limb(g,shoulder,elbow,.092,.068,suit);limb(g,elbow,wrist,.066,.047,panels);
   ellipsoid(g,...shoulder,.095,.078,.095,panels);ellipsoid(g,...elbow,.069,.065,.072,armor);
   curvedTube(g,[[side*.16,seatY+.55,-.25],[side*.25,seatY+.48,-.14],[side*.28,seatY+.33,-.01]],.013,trim);
-  ellipsoid(g,...wrist,.052,.043,.066,armor);
+  ellipsoid(g,...wrist,.052,.043,.066,armor);for(let finger=0;finger<4;finger++)ellipsoid(g,wrist[0]+(finger-1.5)*.015,wrist[1]+.028,wrist[2]+.035,.007,.009,.022,panels);
   const hip=[side*.135,seatY+.06,-.35],knee=[side*.22,.62,.14],ankle=[side*.23,.39,-.06];
   limb(g,hip,knee,.105,.078,suit);limb(g,knee,ankle,.075,.058,panels);
   ellipsoid(g,side*.235,.63,.17,.082,.10,.035,armor);
