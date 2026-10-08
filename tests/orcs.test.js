@@ -10,9 +10,9 @@ test('orcs find a parked racer at the start and attack repeatedly without rider 
  assert(rider.hits>=2);assert(rider.penalty>=4);assert.equal(rider.speed,0);assert.equal(rider.x,start.x);assert.equal(rider.z,start.z);
  assert.equal(rider.health,0);assert.equal(rider.finished,true);assert(orcs.every(o=>o.targetId!==rider.id));
 });
-test('a slow bike can escape an attack on grass during the swing recovery',()=>{
+test('a slow bike can escape an attack along the road during the swing recovery',()=>{
  const orcs=createOrcs(),orc=orcs[0],rider={id:42,...createRider('cub')};
- rider.x=orc.x;rider.z=orc.z+1.2;rider.y=groundHeight(rider.x,rider.z);rider.yaw=0;
+ rider.x=orc.x;rider.z=orc.z+1.2;rider.y=groundHeight(rider.x,rider.z);rider.yaw=orc.yaw;
  tick(orcs,rider,{},1);assert.equal(rider.hits,1);assert.equal(orc.mode,'attack');
  tick(orcs,rider,{throttle:1},300);assert.equal(rider.hits,1);assert(distance(orc,rider)>2);
 });

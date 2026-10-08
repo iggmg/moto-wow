@@ -1,5 +1,5 @@
 import { damageRider } from './health.js';
-export const VERSION = 6;
+export const VERSION = 7;
 export const STEP = 1 / 60;
 import {DEFAULT_TRACK,PHYSICS_VERSION,CHECKPOINTS,trackData,trackById,trackPoint,trackHeading,groundHeight,baseHeight,rampAt,featureCoords,surfaceAt,ORCS} from './tracks.js';
 export * from './tracks.js';

@@ -92,6 +92,12 @@ test('open matchmaking respects course/weather and friends inherit the host cour
  const ar=a.received[0],br=b.received[0],cr=c.received[0];assert.equal(ar.room,cr.room);assert.notEqual(ar.room,br.room);assert.equal(ar.race.trackId,'meadow');assert.equal(br.race.trackId,'summit');assert.equal(br.orcs.length,6);assert.equal(ar.orcs.length,3);
  const d=await join(s,'FriendByCode','rain',{mode:'open',room:ar.room,trackId:'canyon'});assert.equal(d.received[0].race.trackId,'meadow');assert.equal(d.received[0].weather,'clear');assert.equal(d.received[0].players.find(p=>p.id===d.id).trackId,'meadow');
  a.ws.send(JSON.stringify({type:'track',trackId:'summit',physicsVersion:5}));await new Promise(r=>setTimeout(r,70));assert.equal(s.game.rooms.get(ar.room).trackId,'meadow');
- const e=await join(s,'OldProtocol','clear',{version:5});assert.equal(e.received[0].type,'error');for(const p of [a,b,c,d,e])p.ws.close();
+ const e=await join(s,'OldProtocol','clear',{version:6});assert.equal(e.received[0].type,'error');for(const p of [a,b,c,d,e])p.ws.close();
+ }finally{await s.game.close();}
+});
+
+test('archived revision-one records remain visible without entering the revised course ranking',async()=>{
+ const s=await setup();try{const r=await s.api('/auth/register',{nickname:'ArchiveRider',password:'only-this-game-987'});s.game.store.record(r.data.user.id,'mt07',72.95,{trackId:'meadow',trackRevision:1,physicsVersion:6});
+ const old=(await s.api('/leaderboard?track=meadow&physics=6')).data;assert.equal(old.context.trackRevision,1);assert.equal(old.entries[0].seconds,72.95);const current=(await s.api('/leaderboard?track=meadow')).data;assert.equal(current.context.trackRevision,2);assert.equal(current.context.physicsVersion,7);assert.equal(current.entries.length,0);
  }finally{await s.game.close();}
 });
