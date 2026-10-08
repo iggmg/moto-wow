@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtempSync,rmSync,statSync} from 'node:fs';
+import {mkdtempSync,rmSync,statSync,readdirSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {DatabaseSync} from 'node:sqlite';
@@ -11,7 +11,7 @@ test('verified backup restores committed WAL accounts, session and best lap priv
  const root=mkdtempSync(join(tmpdir(),'moto-backup-')),store=createStore(join(root,'live.sqlite'));
  try{
   const account=await store.register('BackupRider','unique-game-password');store.record(account.user.id,'mt07',91.25);
-  const path=await backupStore(store.db,join(root,'backups')),restored=new DatabaseSync(path,{readOnly:true});
+  const path=await backupStore(store.db,join(root,'backups'));assert.equal(readdirSync(join(root,'backups')).filter(f=>f.includes('.tmp')).length,0);const restored=new DatabaseSync(path,{readOnly:true});
   try{
    assert.equal(restored.prepare('SELECT nickname FROM users').get().nickname,'BackupRider');
    assert.equal(restored.prepare('SELECT MIN(seconds) best FROM laps').get().best,91.25);

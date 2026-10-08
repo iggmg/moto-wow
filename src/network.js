@@ -1,3 +1,4 @@
+import {VERSION} from '../shared/game.js';
 const origin=(import.meta.env.VITE_API_URL||'').replace(/\/$/,'');
 let token=null;
 export const api={
@@ -12,7 +13,7 @@ export const api={
     const base=new URL(origin||location.origin);base.protocol=base.protocol==='https:'?'wss:':'ws:';base.pathname='/ws';base.search=`ticket=${encodeURIComponent(ticket)}`;
     return new Promise((resolve,reject)=>{
       const ws=new WebSocket(base),timer=setTimeout(()=>{ws.close();reject(new Error('Не удалось подключиться к комнате.'));},8000);let joined=false;
-      ws.onopen=()=>ws.send(JSON.stringify({type:'join',room,bike,weather,...options}));
+      ws.onopen=()=>ws.send(JSON.stringify({type:'join',room,bike,weather,...options,version:VERSION}));
       ws.onmessage=e=>{let msg;try{msg=JSON.parse(e.data);}catch{return;}if(msg.type==='error'){clearTimeout(timer);reject(new Error(msg.error));ws.close();return;}if(msg.type==='joined'){joined=true;clearTimeout(timer);resolve({ws,message:msg});}else onMessage(msg);};
       ws.onerror=()=>{clearTimeout(timer);if(!joined)reject(new Error('Игровой сервер недоступен.'));};
       ws.onclose=e=>{clearTimeout(timer);if(joined)onClose(e);else reject(new Error('Подключение к комнате закрыто.'));};

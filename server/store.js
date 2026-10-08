@@ -3,6 +3,9 @@ import { randomBytes, scrypt as scryptCb, timingSafeEqual, createHash } from 'no
 import { promisify } from 'node:util';
 import { mkdirSync,chmodSync } from 'node:fs';
 import { dirname } from 'node:path';
+import {DEFAULT_TRACK,PHYSICS_VERSION,trackById} from '../shared/tracks.js';
+const context=(c={})=>({trackId:c.trackId||DEFAULT_TRACK,trackRevision:c.trackRevision||trackById(c.trackId).revision,physicsVersion:c.physicsVersion||PHYSICS_VERSION,mode:c.mode||'open',weather:c.weather||'clear'});
+const values=c=>[c.trackId,c.trackRevision,c.physicsVersion,c.mode,c.weather];
 const scrypt=promisify(scryptCb);
 const digest=token=>createHash('sha256').update(token).digest('hex');
 export function createStore(path) {
@@ -13,6 +16,10 @@ export function createStore(path) {
     CREATE TABLE IF NOT EXISTS sessions (token TEXT PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id), expires INTEGER NOT NULL);
     CREATE TABLE IF NOT EXISTS laps (id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id), bike TEXT NOT NULL, seconds REAL NOT NULL CHECK(seconds > 0), created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
     CREATE INDEX IF NOT EXISTS lap_user_bike ON laps(user_id,bike,seconds);`);
+  // Preserve old records as version 5; new courses/rules never share a ranking.
+  const columns=new Set(db.prepare('PRAGMA table_info(laps)').all().map(c=>c.name));
+  for(const [name,definition]of Object.entries({track:"TEXT NOT NULL DEFAULT 'rift'",revision:'INTEGER NOT NULL DEFAULT 1',physics:'INTEGER NOT NULL DEFAULT 5',mode:"TEXT NOT NULL DEFAULT 'legacy'",weather:"TEXT NOT NULL DEFAULT 'clear'"}))if(!columns.has(name))db.exec(`ALTER TABLE laps ADD COLUMN ${name} ${definition}`);
+  db.exec('CREATE INDEX IF NOT EXISTS lap_context ON laps(track,revision,physics,mode,weather,bike,seconds)');
   const publicUser=u=>({id:u.id,nickname:u.nickname});
   function issueSession(user){db.prepare('DELETE FROM sessions WHERE user_id=? AND token NOT IN (SELECT token FROM sessions WHERE user_id=? ORDER BY expires DESC LIMIT 4)').run(user.id,user.id);const token=randomBytes(32).toString('hex');db.prepare('INSERT INTO sessions VALUES(?,?,?)').run(digest(token),user.id,Date.now()+7*86400000);return {user:publicUser(user),token};}
   return {
@@ -33,9 +40,9 @@ export function createStore(path) {
     },
     session(token) {if(typeof token!=='string'||token.length!==64)return null;const u=db.prepare('SELECT u.id,u.nickname FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token=? AND s.expires>?').get(digest(token),Date.now());return u?publicUser(u):null;},
     logout(token){if(token)db.prepare('DELETE FROM sessions WHERE token=?').run(digest(token));},
-    record(userId,bike,seconds){db.prepare('INSERT INTO laps(user_id,bike,seconds) VALUES(?,?,?)').run(userId,bike,seconds);},
-    leaderboard(bike){return db.prepare(`SELECT u.nickname,l.bike,MIN(l.seconds) seconds,COUNT(*) laps FROM laps l JOIN users u ON u.id=l.user_id ${bike?'WHERE l.bike=?':''} GROUP BY l.user_id,l.bike ORDER BY seconds ASC LIMIT 50`).all(...(bike?[bike]:[]));},
-    stats(userId){return db.prepare('SELECT bike,MIN(seconds) best,COUNT(*) laps FROM laps WHERE user_id=? GROUP BY bike').all(userId);},
+    record(userId,bike,seconds,c={}){const v=context(c);db.prepare('INSERT INTO laps(user_id,bike,seconds,track,revision,physics,mode,weather) VALUES(?,?,?,?,?,?,?,?)').run(userId,bike,seconds,...values(v));},
+    leaderboard(bike,c={}){const v=context(c);return db.prepare(`SELECT u.nickname,l.bike,MIN(l.seconds) seconds,COUNT(*) laps FROM laps l JOIN users u ON u.id=l.user_id WHERE l.track=? AND l.revision=? AND l.physics=? AND l.mode=? AND l.weather=? ${bike?'AND l.bike=?':''} GROUP BY l.user_id,l.bike ORDER BY seconds ASC LIMIT 50`).all(...values(v),...(bike?[bike]:[]));},
+    stats(userId,c={}){const v=context(c);return db.prepare('SELECT bike,MIN(seconds) best,COUNT(*) laps FROM laps WHERE user_id=? AND track=? AND revision=? AND physics=? AND mode=? AND weather=? GROUP BY bike').all(userId,...values(v));},
     cleanup(){db.prepare('DELETE FROM sessions WHERE expires<?').run(Date.now());},
     close(){db.close();}
   };

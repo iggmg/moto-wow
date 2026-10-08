@@ -1,7 +1,8 @@
 import * as T from 'three';
 import { Sky } from 'three/addons/objects/Sky.js';
 import { mergeGeometries,mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
-import { TRACK,TRACK_WIDTH,GATES,OBSTACLES,ORCS,trackPoint,trackHeading,groundHeight,orcPosition,nearestTrack,surfaceAt,riverAt } from '../shared/game.js';
+import { orcPosition } from '../shared/game.js';
+import * as courses from '../shared/tracks.js';
 import { buildOrc } from './models.js';
 import { buildLandscape } from './landscape.js';
 import { loadOrcs,animateOrc } from './enemies.js';
@@ -35,8 +36,8 @@ function foliageTexture(fern=false){const c=document.createElement('canvas');c.w
  }
  const t=new T.CanvasTexture(c);t.colorSpace=T.SRGBColorSpace;t.anisotropy=4;return t;
 }
-function road(scene){const pos=[],uv=[],colors=[],indices=[],groups=[],N=512,M=24;
- for(let i=0;i<=N;i++){const p=trackPoint(i/N),a=trackHeading(i/N),nx=Math.cos(a),nz=-Math.sin(a),mud=i/N>.19&&i/N<.27||i/N>.61&&i/N<.70;
+function road(scene,id){const {width:TRACK_WIDTH}=courses.trackData(id),trackPoint=t=>courses.trackPoint(t,id),trackHeading=t=>courses.trackHeading(t,id),groundHeight=(x,z)=>courses.groundHeight(x,z,id),surfaceAt=(x,z)=>courses.surfaceAt(x,z,'clear',id);const pos=[],uv=[],colors=[],indices=[],groups=[],N=512,M=24;
+ for(let i=0;i<=N;i++){const p=trackPoint(i/N),a=trackHeading(i/N),nx=Math.cos(a),nz=-Math.sin(a),mud=surfaceAt(p.x,p.z).name==='mud';
   for(let j=0;j<=M;j++){const offset=(j/M-.5)*(TRACK_WIDTH+1.5)*(1+.015*Math.sin(i*.39)+.012*Math.sin(i*.81)),x=p.x+nx*offset,z=p.z+nz*offset,rut=Math.exp(-(((Math.abs(offset)-1.05)/.3)**2)),edge=Math.abs(offset)/(TRACK_WIDTH/2+.75);
    pos.push(x,groundHeight(x,z)+.045-.02*rut+.013*Math.sin(i*2+j),z);uv.push(j/M*3,i/5);
    const c=new T.Color(surfaceAt(p.x,p.z).name==='sand'?0xd4bd85:mud?0x756a58:0xa3937a).multiplyScalar(1-rut*.19);if(edge>.85)c.multiplyScalar(.8);colors.push(c.r,c.g,c.b);
@@ -54,38 +55,41 @@ function mergeScenery(scene,exclude){
  });
  for(const o of remove)o.removeFromParent();for(const b of buckets.values()){const g=mergeGeometries(b.geos,false);if(g){const o=mesh(scene,g,b.material);o.castShadow=b.shadow;}for(const geo of b.geos)geo.dispose();}
 }
-export function buildWorld(scene){
- const landscape=buildLandscape(scene);
+export function buildWorld(parent,id=courses.DEFAULT_TRACK){
+ const scene=new T.Group();parent.add(scene);const course=courses.trackData(id),{TRACK,GATES,OBSTACLES,ORCS,width:TRACK_WIDTH}=course;
+ const trackPoint=t=>courses.trackPoint(t,id),trackHeading=t=>courses.trackHeading(t,id),groundHeight=(x,z)=>courses.groundHeight(x,z,id),nearestTrack=(x,z)=>courses.nearestTrack(x,z,id),riverAt=(x,z)=>courses.riverAt(x,z,id);
+ const mobile=matchMedia('(pointer:coarse)').matches,alpine=course.biome==='summit',canyon=course.biome==='canyon';
+ const landscape=buildLandscape(scene,id);
  const rnd=seeded(111),terrain=new T.PlaneGeometry(520,420,180,150);terrain.rotateX(-Math.PI/2);const positions=terrain.attributes.position;
- for(let i=0;i<positions.count;i++){const x=positions.getX(i),z=positions.getZ(i);positions.setY(i,groundHeight(x,z));}terrain.computeVertexNormals();const ground=surface('forest_floor',0xa9b093,100);ground.map.repeat.set(100,80);ground.normalMap.repeat.copy(ground.map.repeat);ground.roughnessMap.repeat.copy(ground.map.repeat);mesh(scene,terrain,ground).castShadow=false;road(scene);
+ for(let i=0;i<positions.count;i++){const x=positions.getX(i),z=positions.getZ(i);positions.setY(i,groundHeight(x,z));}terrain.computeVertexNormals();const ground=surface('forest_floor',alpine?0x9babae:canyon?0xc1a77c:course.biome==='meadow'?0xb4c58d:0xa9b093,100);ground.map.repeat.set(100,80);ground.normalMap.repeat.copy(ground.map.repeat);ground.roughnessMap.repeat.copy(ground.map.repeat);mesh(scene,terrain,ground).castShadow=false;road(scene,id);
  const bark=surface('bark_brown_01',0xb6ab93),rockMat=surface('rock_boulder_dry',0x6c7c70),stone=surface('rock_boulder_dry',0x8c9a92),darkStone=surface('rock_boulder_dry',0x4d6059),gold=mat(0xc49c52,.43,.65),banner=mat(0x67333d);
  const trees=[],leaves=[],ferns=[],rocks=[],grass=[];
- for(let i=0;i<650;i++){const x=(rnd()-.5)*450,z=(rnd()-.5)*350,n=nearestTrack(x,z);if(riverAt(x,z)||n.distance<10||Math.hypot(x+25,z-125)<25)continue;const y=groundHeight(x,z),s=.75+rnd()*.75,rot=rnd()*6.28;trees.push({x,y,z,scale:[s,s,s],rotation:[0,rot,0]});
+ for(let i=0;i<(mobile?300:alpine?360:650);i++){const x=(rnd()-.5)*450,z=(rnd()-.5)*350,n=nearestTrack(x,z);if(riverAt(x,z)||n.distance<TRACK_WIDTH/2+4||Math.hypot(x+25,z-125)<25)continue;const y=groundHeight(x,z),s=.75+rnd()*.75,rot=rnd()*6.28;trees.push({x,y,z,scale:[s,s,s],rotation:[0,rot,0]});
   for(let j=0;j<28;j++){const a=rnd()*6.28,r=Math.sqrt(rnd())*4.8*s;leaves.push({x:x+Math.cos(a)*r,y:y+(8.5+rnd()*6)*s,z:z+Math.sin(a)*r,scale:[(5+rnd()*3)*s,(4+rnd()*3)*s,1],rotation:[(rnd()-.5)*1.5,rnd()*6.28,(rnd()-.5)*.6],color:new T.Color().setHSL(.24+rnd()*.07,.35,.32+rnd()*.13)});}
  }
  scatter(scene,treeGeometry(36),bark,trees).castShadow=true;
  const leafMaterial=new T.MeshStandardMaterial({map:foliageTexture(),alphaTest:.5,side:T.DoubleSide,roughness:1});scatter(scene,new T.PlaneGeometry(1,1),leafMaterial,leaves).castShadow=true;
- for(let i=0;i<1700;i++){const x=(rnd()-.5)*400,z=(rnd()-.5)*310,n=nearestTrack(x,z);if(riverAt(x,z)||n.distance<7.2)continue;const s=.65+rnd()*1.3;for(let j=0;j<3;j++)ferns.push({x,y:groundHeight(x,z)+s*.55,z,scale:[s*2,s*1.1,1],rotation:[-.2,j*Math.PI/3+rnd()*.4,0]});}
+ for(let i=0;i<(mobile?700:alpine?700:1700);i++){const x=(rnd()-.5)*400,z=(rnd()-.5)*310,n=nearestTrack(x,z);if(riverAt(x,z)||n.distance<TRACK_WIDTH/2+1.2)continue;const s=.65+rnd()*1.3;for(let j=0;j<3;j++)ferns.push({x,y:groundHeight(x,z)+s*.55,z,scale:[s*2,s*1.1,1],rotation:[-.2,j*Math.PI/3+rnd()*.4,0]});}
  const fernMaterial=new T.MeshStandardMaterial({map:foliageTexture(true),alphaTest:.5,side:T.DoubleSide,roughness:1,color:0x8eb16e});scatter(scene,new T.PlaneGeometry(1,1),fernMaterial,ferns);
  // Narrow curved blades give the verges an uneven silhouette without thousands of draw calls.
  const blades=[],bladeUV=[],bladeIndices=[];
  for(let j=0;j<12;j++){const a=rnd()*6.28,x=(rnd()-.5)*.9,z=(rnd()-.5)*.9,h=.25+rnd()*.55,w=.018+rnd()*.015,k=blades.length/3;blades.push(x-w,0,z,x+w,0,z,x+Math.sin(a)*h*.3-w*.4,h*.6,z+Math.cos(a)*h*.2,x+Math.sin(a)*h*.3+w*.4,h*.6,z+Math.cos(a)*h*.2,x+Math.sin(a)*h*.5,h,z+Math.cos(a)*h*.4);bladeUV.push(0,0,1,0,0,.6,1,.6,.5,1);bladeIndices.push(k,k+1,k+2,k+1,k+3,k+2,k+2,k+3,k+4);}
  const grassGeo=new T.BufferGeometry();grassGeo.setAttribute('position',new T.Float32BufferAttribute(blades,3));grassGeo.setAttribute('uv',new T.Float32BufferAttribute(bladeUV,2));grassGeo.setIndex(bladeIndices);grassGeo.computeVertexNormals();
- for(let i=0;i<3500;i++){const t=rnd(),p=trackPoint(t),a=trackHeading(t),d=(rnd()<.5?-1:1)*(6.7+rnd()*11),x=p.x+Math.cos(a)*d,z=p.z-Math.sin(a)*d,s=.7+rnd()*.8;grass.push({x,y:groundHeight(x,z),z,scale:[s,s,s],rotation:[0,rnd()*6.28,0],color:new T.Color().setHSL(.20+rnd()*.1,.32,.24+rnd()*.12)});}
+ for(let i=0;i<(mobile?1600:3500);i++){const t=rnd(),p=trackPoint(t),a=trackHeading(t),d=(rnd()<.5?-1:1)*(TRACK_WIDTH/2+.7+rnd()*11),x=p.x+Math.cos(a)*d,z=p.z-Math.sin(a)*d,s=.7+rnd()*.8;grass.push({x,y:groundHeight(x,z),z,scale:[s,s,s],rotation:[0,rnd()*6.28,0],color:new T.Color().setHSL(.20+rnd()*.1,.32,.24+rnd()*.12)});}
  scatter(scene,grassGeo,new T.MeshStandardMaterial({color:0x8caa65,side:T.DoubleSide,roughness:1}),grass);
  const rockGeo=mergeVertices(new T.IcosahedronGeometry(1,2)),rp=rockGeo.attributes.position;for(let i=0;i<rp.count;i++){const v=new T.Vector3().fromBufferAttribute(rp,i);v.multiplyScalar(1+.16*Math.sin(v.x*12+v.y*8)*Math.cos(v.z*8));rp.setXYZ(i,v.x,v.y,v.z);}rockGeo.computeVertexNormals();
- for(let i=0;i<260;i++){const x=(rnd()-.5)*420,z=(rnd()-.5)*320;if(riverAt(x,z)||nearestTrack(x,z).distance<8)continue;const s=.3+rnd()*2.5;rocks.push({x,y:groundHeight(x,z)+s*.25,z,scale:[s,s*.65,s*.8],rotation:[rnd(),rnd()*6.28,rnd()]});}scatter(scene,rockGeo,rockMat,rocks).castShadow=true;
+ for(let i=0;i<(mobile?150:260);i++){const x=(rnd()-.5)*420,z=(rnd()-.5)*320;if(riverAt(x,z)||nearestTrack(x,z).distance<TRACK_WIDTH/2+2)continue;const s=.3+rnd()*2.5;rocks.push({x,y:groundHeight(x,z)+s*.25,z,scale:[s,s*.65,s*.8],rotation:[rnd(),rnd()*6.28,rnd()]});}scatter(scene,rockGeo,rockMat,rocks).castShadow=true;
  // Layered cliffs outside the driving area, rather than geometric cones.
  const mountains=new T.PlaneGeometry(950,750,190,150);mountains.rotateX(-Math.PI/2);const mp=mountains.attributes.position,mi=[];
  for(let i=0;i<mp.count;i++){const x=mp.getX(i),z=mp.getZ(i),border=Math.max(Math.abs(x)-230,Math.abs(z)-190),h=Math.max(0,border)*(.75+.25*Math.sin(x*.026)+.2*Math.cos(z*.035));mp.setY(i,groundHeight(x,z)+h);}
  for(let y=0;y<150;y++)for(let x=0;x<190;x++){const k=y*191+x,wx=mp.getX(k),wz=mp.getZ(k);if(Math.abs(wx)<215&&Math.abs(wz)<175)continue;mi.push(k,k+191,k+1,k+1,k+191,k+192);}
- mountains.setIndex(mi);mountains.computeVertexNormals();const mountainMat=surface('rock_boulder_dry',0x7e8a7f,50);mesh(scene,mountains,mountainMat).castShadow=false;
+ mountains.setIndex(mi);mountains.computeVertexNormals();const mountainMat=surface('rock_boulder_dry',alpine?0x8e9bab:canyon?0xa38a68:0x7e8a7f,50);mesh(scene,mountains,mountainMat).castShadow=false;
  for(const o of OBSTACLES){const y=groundHeight(o.x,o.z);if(o.type==='rock'){const rock=mesh(scene,rockGeo,rockMat,o.x,y+.6,o.z);rock.scale.set(1.35,1.05,1.13);for(let j=0;j<4;j++){const rubble=mesh(scene,rockGeo,rockMat,o.x+Math.cos(j*2)*1.1,y+.15,o.z+Math.sin(j*2)*.8);rubble.scale.setScalar(.20+j*.04);}}else{const group=new T.Group();group.position.set(o.x,y+.43,o.z);group.rotation.y=o.heading;scene.add(group);const log=mesh(group,new T.CylinderGeometry(.37,.47,3.1,20),bark);log.rotation.z=Math.PI/2;
   for(const side of [-1,1]){const end=mesh(group,new T.CircleGeometry(.36,32),mat(0xaf956d),side*1.56,0,0);end.rotation.y=side*Math.PI/2;for(let j=1;j<5;j++){const ring=mesh(group,new T.TorusGeometry(j*.065,.006,4,32),mat(0x755b39),side*1.565,0,0);ring.rotation.y=Math.PI/2;}}mesh(group,branchGeometry([[.6,.1,0],[.8,.4,.3],[.9,.65,.55]],.085),bark);}}
  // Wet patches occupy the mud sectors and reflect the sky.
  const waterMask=document.createElement('canvas');waterMask.width=waterMask.height=128;const waterContext=waterMask.getContext('2d'),gradient=waterContext.createRadialGradient(64,64,32,64,64,64);gradient.addColorStop(0,'white');gradient.addColorStop(.78,'#dddddd');gradient.addColorStop(1,'black');waterContext.fillStyle=gradient;waterContext.fillRect(0,0,128,128);
  const puddleMaterial=new T.MeshPhysicalMaterial({color:0x293329,roughness:.23,metalness:.08,clearcoat:.45,transparent:true,opacity:.8,alphaMap:new T.CanvasTexture(waterMask),depthWrite:false});
- for(let i=0;i<32;i++){const t=(i<16?.195:.615)+(i%16)*.0048,p=trackPoint(t),a=trackHeading(t),offset=(rnd()-.5)*7,x=p.x+Math.cos(a)*offset,z=p.z-Math.sin(a)*offset;const puddle=mesh(scene,new T.CircleGeometry(1,48),puddleMaterial,x,groundHeight(x,z)+.25,z);const vertices=puddle.geometry.attributes.position;for(let v=1;v<vertices.count;v++){const x=vertices.getX(v),y=vertices.getY(v),a=Math.atan2(y,x),r=1+.10*Math.sin(a*7+i)+.06*Math.cos(a*11);vertices.setXY(v,x*r,y*r);}puddle.rotation.x=-Math.PI/2;puddle.rotation.z=a;puddle.scale.set(.45+rnd()*.85,1+rnd()*1.8,1);puddle.castShadow=false;}
+ for(let i=0;i<course.mud.length*16;i++){const sector=course.mud[Math.floor(i/16)],t=sector[0]+.004+(i%16)/16*(sector[1]-sector[0]-.008),p=trackPoint(t),a=trackHeading(t),offset=(rnd()-.5)*7,x=p.x+Math.cos(a)*offset,z=p.z-Math.sin(a)*offset;const puddle=mesh(scene,new T.CircleGeometry(1,48),puddleMaterial,x,groundHeight(x,z)+.25,z);const vertices=puddle.geometry.attributes.position;for(let v=1;v<vertices.count;v++){const x=vertices.getX(v),y=vertices.getY(v),a=Math.atan2(y,x),r=1+.10*Math.sin(a*7+i)+.06*Math.cos(a*11);vertices.setXY(v,x*r,y*r);}puddle.rotation.x=-Math.PI/2;puddle.rotation.z=a;puddle.scale.set(.45+rnd()*.85,1+rnd()*1.8,1);puddle.castShadow=false;}
  const orcs=ORCS.map(o=>{const model=buildOrc();scene.add(model);return {data:o,model};});
  // Masonry courses, inset windows, roof battlements and buttresses.
  for(let i=0;i<3;i++){const x=-40+i*19,z=122+(i%2)*9,y=groundHeight(x,z);mesh(scene,new T.CylinderGeometry(5,5.7,18,20),darkStone,x,y+9,z);
@@ -95,18 +99,18 @@ export function buildWorld(scene){
   if(i<2){mesh(scene,new T.BoxGeometry(14,9,3),stone,x+9,y+4.5,z);for(let j=0;j<5;j++)mesh(scene,new T.BoxGeometry(1.5,1.9,3.2),darkStone,x+5+j*2.8,y+9.8,z);}
  }
  const gateMeshes=[];GATES.forEach((p,i)=>{const group=new T.Group();group.position.set(p.x,groundHeight(p.x,p.z),p.z);group.rotation.y=trackHeading(p.t);scene.add(group);const activeMat=new T.MeshStandardMaterial({color:0xbaacd9,emissive:0x7850cc,emissiveIntensity:.28,roughness:.4,metalness:.3});
-  for(const x of [-7.1,7.1]){mesh(group,new T.BoxGeometry(i===0?1.5:.35,i===0?8:3.2,i===0?1.4:.35),i===0?stone:bark,x,i===0?4:1.6,0);mesh(group,new T.OctahedronGeometry(i===0?.45:.26),activeMat,x,i===0?8.3:3.5,0);if(i)mesh(group,new T.BoxGeometry(.7,1.2,.05),banner,x,2,-.21);}
-  if(i===0){mesh(group,new T.BoxGeometry(16,1,1.5),stone,0,7.8,0);for(const x of [-6,6]){mesh(group,new T.BoxGeometry(1.8,3,.12),banner,x,5.4,-.9);for(let j=0;j<4;j++)mesh(group,new T.BoxGeometry(1.6,.12,1.55),darkStone,x+(x>0?1.1:-1.1),1+j*1.8,0);}
-   const canvas=document.createElement('canvas');canvas.width=1024;canvas.height=128;const ctx=canvas.getContext('2d');ctx.fillStyle='#24392f';ctx.fillRect(0,0,1024,128);ctx.strokeStyle='#be9b5a';ctx.lineWidth=6;ctx.strokeRect(8,8,1008,112);ctx.fillStyle='#ecd8a5';ctx.font='bold 60px Georgia';ctx.textAlign='center';ctx.fillText('MOTO  •  RIFT',512,88);const tex=new T.CanvasTexture(canvas);tex.colorSpace=T.SRGBColorSpace;mesh(group,new T.PlaneGeometry(10,1.25),new T.MeshBasicMaterial({map:tex,side:T.DoubleSide}),0,7.8,-.81);
-   for(let j=0;j<12;j++){const tile=mesh(group,new T.PlaneGeometry(1.05,.6),mat(j%2?0xe2d9bc:0x30382e),j-5.5,.25,0);tile.rotation.x=-Math.PI/2;}
+  for(const x of [-TRACK_WIDTH/2-1.1,TRACK_WIDTH/2+1.1]){mesh(group,new T.BoxGeometry(i===0?1.5:.35,i===0?8:3.2,i===0?1.4:.35),i===0?stone:bark,x,i===0?4:1.6,0);mesh(group,new T.OctahedronGeometry(i===0?.45:.26),activeMat,x,i===0?8.3:3.5,0);if(i)mesh(group,new T.BoxGeometry(.7,1.2,.05),banner,x,2,-.21);}
+  if(i===0){mesh(group,new T.BoxGeometry(TRACK_WIDTH+4,1,1.5),stone,0,7.8,0);for(const x of [-6,6]){mesh(group,new T.BoxGeometry(1.8,3,.12),banner,x,5.4,-.9);for(let j=0;j<4;j++)mesh(group,new T.BoxGeometry(1.6,.12,1.55),darkStone,x+(x>0?1.1:-1.1),1+j*1.8,0);}
+   const canvas=document.createElement('canvas');canvas.width=1024;canvas.height=128;const ctx=canvas.getContext('2d');ctx.fillStyle='#24392f';ctx.fillRect(0,0,1024,128);ctx.strokeStyle='#be9b5a';ctx.lineWidth=6;ctx.strokeRect(8,8,1008,112);ctx.fillStyle='#ecd8a5';ctx.font='bold 48px Georgia';ctx.textAlign='center';ctx.fillText(course.name.toUpperCase(),512,88);const tex=new T.CanvasTexture(canvas);tex.colorSpace=T.SRGBColorSpace;mesh(group,new T.PlaneGeometry(10,1.25),new T.MeshBasicMaterial({map:tex,side:T.DoubleSide}),0,7.8,-.81);
+   for(let j=0;j<TRACK_WIDTH;j++){const tile=mesh(group,new T.PlaneGeometry(1.05,.6),mat(j%2?0xe2d9bc:0x30382e),j-(TRACK_WIDTH-1)/2,.25,0);tile.rotation.x=-Math.PI/2;}
   }gateMeshes.push({group,activeMat});
  });
  // Timber barriers mark difficult corners and connect the scenery to the course.
- for(let i=0;i<64;i++){const t=i/64,p=trackPoint(t),a=trackHeading(t);if(t<.1||i%7===0)continue;const group=new T.Group();group.position.set(p.x+Math.cos(a)*8,groundHeight(p.x,p.z),p.z-Math.sin(a)*8);group.rotation.y=a;scene.add(group);for(const z of [-1.8,1.8])mesh(group,new T.CylinderGeometry(.12,.16,1.6,8),bark,0,.8,z);for(const y of [.65,1.3]){const beam=mesh(group,new T.CylinderGeometry(.09,.09,3.6,8),bark,0,y,0);beam.rotation.x=Math.PI/2;}}
+ for(let i=0;i<64;i++){const t=i/64,p=trackPoint(t),a=trackHeading(t);if(t<.1||i%7===0)continue;const group=new T.Group();group.position.set(p.x+Math.cos(a)*(TRACK_WIDTH/2+2),groundHeight(p.x,p.z),p.z-Math.sin(a)*(TRACK_WIDTH/2+2));group.rotation.y=a;scene.add(group);for(const z of [-1.8,1.8])mesh(group,new T.CylinderGeometry(.12,.16,1.6,8),bark,0,.8,z);for(const y of [.65,1.3]){const beam=mesh(group,new T.CylinderGeometry(.09,.09,3.6,8),bark,0,y,0);beam.rotation.x=Math.PI/2;}}
  const portal=new T.Group();portal.position.set(25,groundHeight(25,122)+4,122);scene.add(portal);mesh(portal,new T.TorusGeometry(3,.4,12,60),darkStone);const energy=mesh(portal,new T.CircleGeometry(2.7,48),new T.MeshBasicMaterial({color:0x7961dc,transparent:true,opacity:.68,side:T.DoubleSide}),0,0,.04);for(let i=0;i<12;i++){const a=i/12*6.28;mesh(portal,new T.OctahedronGeometry(.18),new T.MeshBasicMaterial({color:0xc9b0ff}),Math.cos(a)*3,Math.sin(a)*3,.5);}
  mergeScenery(scene,new Set([portal,...landscape.dynamic,...orcs.map(o=>o.model),...gateMeshes.map(o=>o.group)]));
  const ready=loadOrcs(orcs).catch(e=>{console.warn('Orc model fallback',e.message);});
- return {orcs,gateMeshes,portal,ready,landscape,update(time,nextGate,enemies=null,dt=1/60){landscape.update(time);for(const {data,model}of orcs){
+ return {root:scene,trackId:id,orcs,gateMeshes,portal,ready,landscape,dispose(){scene.removeFromParent();const geometries=new Set(),materials=new Set(),textures=new Set();scene.traverse(o=>{if(o.geometry)geometries.add(o.geometry);for(const m of Array.isArray(o.material)?o.material:[o.material])if(m){materials.add(m);for(const v of Object.values(m))if(v?.isCanvasTexture)textures.add(v);}});for(const g of geometries)g.dispose();for(const m of materials)m.dispose();for(const t of textures)t.dispose();},update(time,nextGate,enemies=null,dt=1/60){landscape.update(time);for(const {data,model}of orcs){
    const p=enemies?.find(o=>o.id===data.id)||orcPosition(data,time),running=p.speed>3,attacking=p.mode==='attack',phase=time*(running?11:4)+data.id;
    const position=new T.Vector3(p.x,groundHeight(p.x,p.z)+Math.abs(Math.sin(phase))*(running?.09:.025),p.z);
    // Smooth 20 Hz authoritative snapshots without changing gameplay positions.

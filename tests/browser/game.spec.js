@@ -69,9 +69,28 @@ test('health appears in HUD, lethal orc hits stop riding and solo race can resta
 test('two friends wait in lobby and start together after a shared countdown',async({browser})=>{
  const a=await browser.newContext(),b=await browser.newContext(),p1=await a.newPage(),p2=await b.newPage();try{
   await p1.goto('/');await p2.goto('/');await register(p1,`Host_${stamp}`);await register(p2,`Guest_${stamp}`);
+  await p1.locator('[data-track=meadow]').click();await p2.locator('[data-track=summit]').click();
   for(const p of [p1,p2]){await p.locator('#online-open').click();await p.locator('#room-code').fill(`RACE-${stamp}`);await p.locator('#room-laps').selectOption('1');await p.locator('#online-submit').click();await expect(p.locator('#race-panel-title')).toHaveText('Ждём участников');}
   await expect(p1.locator('#race-panel-text')).toContainText('2 из 8');await expect(p2.locator('#race-host-start')).toBeHidden();await p1.screenshot({path:'artifacts/friends-lobby.png'});await p1.locator('#race-host-start').click();await expect(p2.locator('#countdown')).toBeVisible();
   await p1.keyboard.down('w');await p1.waitForTimeout(600);expect(await p1.evaluate(()=>window.__motoRace.state.speed)).toBe(0);await expect.poll(()=>p1.evaluate(()=>window.__motoRace.state.speed),{timeout:10000}).toBeGreaterThan(2);await p1.keyboard.up('w');
-  const state1=await p1.evaluate(()=>window.__motoRace.roomRace),state2=await p2.evaluate(()=>window.__motoRace.roomRace);expect(state1.startAt).toBe(state2.startAt);expect(state1.phase).toBe('racing');await expect(p2.locator('#lap')).toHaveText('1 / 1');
+  const state1=await p1.evaluate(()=>window.__motoRace.roomRace),state2=await p2.evaluate(()=>window.__motoRace.roomRace);expect(state1.trackId).toBe('meadow');expect(state2.trackId).toBe('meadow');expect(await p2.evaluate(()=>window.__motoRace.world.trackId)).toBe('meadow');expect(state1.startAt).toBe(state2.startAt);expect(state1.phase).toBe('racing');await expect(p2.locator('#lap')).toHaveText('1 / 1');
  }finally{await a.close();await b.close();}
+});
+
+test('mobile multi-touch holds throttle and steering independently without text selection or sticking',async({browser})=>{
+ const context=await browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true}),page=await context.newPage();try{
+ await page.goto('/');await page.locator('#practice-start').click();await expect(page.locator('#hud')).toBeVisible();const cdp=await context.newCDPSession(page);
+ const point=async control=>{const b=await page.locator(`[data-control="${control}"]`).boundingBox();expect(b.width).toBeGreaterThanOrEqual(44);expect(b.height).toBeGreaterThanOrEqual(44);return {x:Math.round(b.x+b.width/2),y:Math.round(b.y+b.height/2),radiusX:4,radiusY:4,force:1};};
+ const throttle={...await point('throttle'),id:1},left={...await point('left'),id:2},right={...await point('right'),id:2};
+ await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[throttle,left]});await expect.poll(()=>page.evaluate(()=>window.__motoRace.inputs())).toEqual({throttle:1,brake:0,steer:-1});await page.waitForTimeout(650);expect(await page.evaluate(()=>String(getSelection()))).toBe('');
+ await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[throttle,right]});await expect.poll(()=>page.evaluate(()=>window.__motoRace.inputs().steer)).toBe(1);
+ await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[right]});await expect.poll(()=>page.evaluate(()=>window.__motoRace.inputs())).toEqual({throttle:1,brake:0,steer:0});
+ await cdp.send('Input.dispatchTouchEvent',{type:'touchCancel',touchPoints:[]});await expect.poll(()=>page.evaluate(()=>window.__motoRace.inputs())).toEqual({throttle:0,brake:0,steer:0});expect(await page.locator('.touch-controls .pressed').count()).toBe(0);
+ await page.screenshot({path:'artifacts/mobile-controls-portrait.png'});await page.setViewportSize({width:320,height:640});for(const control of ['left','right','brake','throttle']){const b=await page.locator(`[data-control="${control}"]`).boundingBox();expect(b.x).toBeGreaterThanOrEqual(0);expect(b.x+b.width).toBeLessThanOrEqual(320);}await page.setViewportSize({width:844,height:390});await page.screenshot({path:'artifacts/mobile-controls-landscape.png'});expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBe(844);
+ }finally{await context.close();}
+});
+test('all courses load their own scenery, minimap, orcs and preferred weather without rendering errors',async({page})=>{
+ const errors=[];page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(m.type()==='error'&&!m.text().includes('401'))errors.push(m.text());});await page.goto('/');await expect(page.locator('#track-selection button')).toHaveCount(4);
+ for(const [id,weather,orcs]of [['meadow','clear',3],['canyon','rain',6],['summit','snow',6],['rift','clear',6]]){await page.locator(`[data-track="${id}"]`).click();await page.locator('#practice-start').click();await expect(page.locator('#hud')).toBeVisible();await expect.poll(()=>page.evaluate(()=>window.__motoRace.world.trackId)).toBe(id);expect(await page.evaluate(()=>window.__motoRace.state.trackId)).toBe(id);expect(await page.evaluate(()=>window.__motoRace.orcs.length)).toBe(orcs);await expect.poll(()=>page.evaluate(()=>window.__motoRace.weatherView.mode)).toBe(weather);await page.screenshot({path:`artifacts/track-${id}.png`});await page.locator('#race-exit').click();}
+ expect(errors).toEqual([]);
 });
