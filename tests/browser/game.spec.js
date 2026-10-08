@@ -32,6 +32,7 @@ test('orcs pursue and attack a stopped motorcycle, with visible warning and anim
  await page.evaluate(()=>{const r=window.__motoRace,o=r.orcs[0];r.state.x=o.x+8;r.state.z=o.z;r.state.speed=0;r.state.y=0;r.state.yaw=-Math.PI/2;r.cameraMode='chase';r.applyCamera(true);});
  await expect(page.locator('#pursuit-warning')).toBeVisible();
  await expect.poll(()=>page.evaluate(()=>window.__motoDebug.state.hits),{timeout:10000}).toBeGreaterThan(0);
+ await expect.poll(()=>page.evaluate(()=>{const r=window.__motoRace,o=r.orcs[0];return Math.hypot(o.x-r.state.x,o.z-r.state.z);}),{timeout:10000}).toBeLessThan(1.4);
  const state=await page.evaluate(()=>{const r=window.__motoRace,o=r.orcs[0],model=r.world.orcs[0].model;return {speed:r.state.speed,penalty:r.state.penalty,target:o.targetId,id:r.id,distance:Math.hypot(o.x-r.state.x,o.z-r.state.z),visualDistance:Math.hypot(o.x-model.position.x,o.z-model.position.z),loaded:model.userData.loaded,actions:[...model.userData.actions.keys()]};});
  expect(state.speed).toBe(0);expect(state.penalty).toBeGreaterThanOrEqual(2);expect(state.target).toBe(state.id);expect(state.distance).toBeLessThan(1.4);expect(state.visualDistance).toBeLessThan(.4);expect(state.loaded).toBe(true);expect(state.actions).toContain('walk');expect(state.actions).toContain('attack');
  await expect(page.locator('#pursuit-warning')).toContainText('АТАКУЕТ');await page.screenshot({path:'artifacts/orc-pursuit.png'});

@@ -1,6 +1,6 @@
 import { friendlyTo,strikeOrc } from './arcade.js';
 import { damageRider } from './health.js';
-export const VERSION = 8;
+export const VERSION = 9;
 export const STEP = 1 / 60;
 import {DEFAULT_TRACK,PHYSICS_VERSION,CHECKPOINTS,trackData,trackById,trackPoint,trackHeading,groundHeight,baseHeight,rampAt,featureCoords,surfaceAt,ORCS} from './tracks.js';
 export * from './tracks.js';
@@ -45,7 +45,7 @@ export function stepOrcs(orcs,riders,dt=STEP,time=0) {
     if(target&&d<1.4&&orc.attackCooldown===0)orc.attackCooldown=1.2;
     orc.mode=target?(orc.attackCooldown>0?'attack':'chase'):Math.hypot(orc.x-home.x,orc.z-home.z)>10?'return':'patrol';
     // Swing recovery gives even a slow bike time to pull away from contact.
-    const speed=orc.mode==='attack'||orc.windup>0?0:target?6.5:orc.mode==='return'?4:2.2;
+    const speed=orc.mode==='attack'||orc.windup>0?0:target?4.2:orc.mode==='return'?4:2.2;
     const travel=Math.min(speed*dt,Math.max(0,d-(target?1.05:0)));
     orc.speed=travel/dt;
     if(d>.01) {
@@ -77,8 +77,10 @@ export function stepRider(s,rawInput,dt=STEP,time=0,orcs=null,weather='clear') {
   const baseGrip={mud:bike.mudGrip,grass:.43,sand:.62,water:.48,snow:.45}[surface.name]??1;
   const slip=s.arcade?.slipUntil>time,boost=s.arcade?.boostUntil>time;const grip=baseGrip*(slip?.32:1)*(weather==='rain'?.80:1),drag={mud:1.5,grass:2.5,sand:1.6,water:2.2,snow:1.1}[surface.name]||0;
   const max=(s.arcade?.fuel===0?6:bike.maxSpeed*(boost?1.22:1))*({mud:.53+grip*.3,grass:.5,sand:.7,water:.55,snow:.68}[surface.name]??1);
+  // Snow remains slippery for steering; low gear still supplies enough drive to restart uphill.
+  const driveGrip=surface.name==='snow'?.80*(slip?.32:1):grip;
   const resistance=.3+s.speed*s.speed*.004+drag;
-  s.speed=clamp(s.speed+(input.throttle*bike.acceleration*grip*(boost?1.8:1)-input.brake*14-resistance)*dt,0,max);
+  s.speed=clamp(s.speed+(input.throttle*bike.acceleration*driveGrip*(boost?1.8:1)-input.brake*14-resistance)*dt,0,max);
   s.steer+=(input.steer-s.steer)*Math.min(1,dt*7*grip);
   s.yaw-=s.steer*(s.airborne?.15:1)*bike.handling*(.35+s.speed*.042)/(1+s.speed*.018)*dt*grip;
   if(slip&&!s.airborne)s.yaw+=Math.sin(time*5+s.id)*s.speed*.015*dt;
@@ -100,7 +102,8 @@ export function stepRider(s,rawInput,dt=STEP,time=0,orcs=null,weather='clear') {
     const enemies=orcs||ORCS.map(o=>orcPosition(o,time));
     const obstacle=OBSTACLES.find(o=>Math.hypot(o.x-s.x,o.z-s.z)<o.radius+.5),enemy=enemies.find(o=>Math.hypot(o.x-s.x,o.z-s.z)<1.4);
     if(enemy&&s.arcade&&s.speed>=6)strikeOrc(s,enemy,enemies,time);
-    if(enemy&&!friendlyTo(enemy,s.id,time)||obstacle&&s.speed>1){damageRider(s,enemy?'melee':obstacle.type,s.speed);s.speed*=.5;if(s.health>0){s.vy=1.3;s.airborne=true;}}
+    const melee=enemy&&!friendlyTo(enemy,s.id,time);
+    if(melee||obstacle&&s.speed>1){if(damageRider(s,melee?'melee':obstacle.type,s.speed)&&!melee&&s.health>0){s.vy=1.3;s.airborne=true;}}
   }
   if(s.health===0)return null;
   const gate=GATES[s.nextGate%CHECKPOINTS];

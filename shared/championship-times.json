@@ -1,5 +1,5 @@
 {
-  "physicsVersion": 8,
+  "physicsVersion": 9,
   "calibration": "Safe steering pilot, ordinary controls; isolated from enemy damage. Gold = ceil(reference × 1.12 + 4), silver × 1.35 + 10, bronze × 1.65 + 20.",
   "thresholds": {
     "rift": {
@@ -118,40 +118,40 @@
     },
     "summit": {
       "cub": {
-        "gold": 338,
-        "silver": 412,
-        "bronze": 511,
-        "reference": 297.33
+        "gold": 325,
+        "silver": 397,
+        "bronze": 492,
+        "reference": 285.97
       },
       "exciter": {
-        "gold": 352,
-        "silver": 430,
-        "bronze": 533,
-        "reference": 310.62
+        "gold": 348,
+        "silver": 424,
+        "bronze": 526,
+        "reference": 306.48
       },
       "himalayan": {
-        "gold": 405,
-        "silver": 493,
-        "bronze": 610,
-        "reference": 357.38
+        "gold": 397,
+        "silver": 484,
+        "bronze": 599,
+        "reference": 350.77
       },
       "winner": {
-        "gold": 337,
-        "silver": 411,
-        "bronze": 510,
-        "reference": 296.68
+        "gold": 332,
+        "silver": 405,
+        "bronze": 503,
+        "reference": 292.57
       },
       "pcx": {
-        "gold": 372,
-        "silver": 453,
-        "bronze": 561,
-        "reference": 327.85
+        "gold": 363,
+        "silver": 442,
+        "bronze": 548,
+        "reference": 319.95
       },
       "mt07": {
-        "gold": 377,
-        "silver": 459,
-        "bronze": 569,
-        "reference": 332.45
+        "gold": 373,
+        "silver": 454,
+        "bronze": 563,
+        "reference": 328.72
       }
     }
   }
