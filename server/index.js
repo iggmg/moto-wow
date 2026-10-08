@@ -4,12 +4,13 @@ import { randomBytes } from 'node:crypto';
 import { WebSocketServer, WebSocket } from 'ws';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
+import { isIP } from 'node:net';
 import { createRoom,roomInfo,startRoom,returnToLobby } from './rooms.js';
 import { createStore } from './store.js';
 import { stepCombat } from '../shared/combat.js';
 import { BIKES,WEATHER,VERSION,STEP,createRider,createOrcs,stepOrcs,normalizeInput,stepRider,resetRider } from '../shared/game.js';
 
-export function createGameServer({database=process.env.DATABASE_PATH||'./data/moto-wow.sqlite',origins=(process.env.PUBLIC_ORIGIN||'http://127.0.0.1:5173,http://localhost:5173').split(','),secure=process.env.COOKIE_SECURE==='1'}={}) {
+export function createGameServer({database=process.env.DATABASE_PATH||'./data/moto-wow.sqlite',origins=(process.env.PUBLIC_ORIGIN||'http://127.0.0.1:5173,http://localhost:5173').split(','),secure=process.env.COOKIE_SECURE==='1',trustRailway=process.env.TRUST_RAILWAY_PROXY==='1'}={}) {
   const store=createStore(database),app=express(),server=createServer(app),wss=new WebSocketServer({noServer:true,maxPayload:2048}),rooms=new Map(),tickets=new Map(),limits=new Map();
   let activeAuth=0;
   const allowed=o=>origins.includes(o);
@@ -25,7 +26,9 @@ export function createGameServer({database=process.env.DATABASE_PATH||'./data/mo
   app.use('/api',(req,res,next)=>{if(req.method==='POST'&&(!allowed(req.headers.origin)||!req.is('application/json')))return res.status(403).json({error:'Недопустимый запрос.'});next();});
   app.use(express.json({limit:'4kb',strict:true}));
   app.use('/api',(req,res,next)=>{
-    const key=req.socket.remoteAddress,now=Date.now();let l=limits.get(key);
+    // Enable only behind Railway's HTTPS edge, which supplies X-Real-IP.
+    const forwarded=req.headers['x-real-ip'];
+    const key=trustRailway&&typeof forwarded==='string'&&isIP(forwarded)?forwarded:req.socket.remoteAddress,now=Date.now();let l=limits.get(key);
     if(!l&&limits.size>=10000)return res.status(503).json({error:'Сервер занят.'});
     if(!l||now-l.start>60000){l={start:now,count:0,auth:0};limits.set(key,l);}l.count++;
     if(l.count>240)return res.status(429).json({error:'Слишком много запросов. Подожди минуту.'});
@@ -117,8 +120,17 @@ export function createGameServer({database=process.env.DATABASE_PATH||'./data/mo
   },30000);
   return {app,server,wss,store,rooms,async close(){clearInterval(loop);clearInterval(housekeeping);for(const ws of wss.clients)ws.terminate();await new Promise(r=>server.close(r));store.close();}};
 }
-if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url)){
+export async function startGameServer(){
   const game=createGameServer(),port=Number(process.env.PORT||8787),host=process.env.HOST||'127.0.0.1';
+  let backupTimer;
+  if(process.env.BACKUP_DIRECTORY){
+    const {backupStore}=await import('./backup.js');
+    await backupStore(game.store.db,process.env.BACKUP_DIRECTORY);
+    backupTimer=setInterval(()=>backupStore(game.store.db,process.env.BACKUP_DIRECTORY).catch(()=>console.error('Database backup failed')),86400000);
+    backupTimer.unref();
+  }
   game.server.listen(port,host,()=>console.log(`Moto WOW game server: http://${host}:${port}`));
-  for(const signal of ['SIGTERM','SIGINT'])process.on(signal,async()=>{await game.close();process.exit(0);});
+  for(const signal of ['SIGTERM','SIGINT'])process.once(signal,async()=>{clearInterval(backupTimer);await game.close();process.exit(0);});
+  return game;
 }
+if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url))await startGameServer();

@@ -4,7 +4,7 @@ import { once } from 'node:events';
 import { WebSocket } from 'ws';
 import { createGameServer } from '../server/index.js';
 const origin='http://127.0.0.1:5173';
-async function setup(){const game=createGameServer({database:':memory:',origins:[origin]});game.server.listen(0,'127.0.0.1');await once(game.server,'listening');const base=`http://127.0.0.1:${game.server.address().port}`;return {game,base,async api(path,body,token){const r=await fetch(`${base}/api${path}`,{method:body?'POST':'GET',headers:{Origin:origin,...(body?{'Content-Type':'application/json'}:{}),...(token?{Authorization:`Bearer ${token}`}:{})},body:body?JSON.stringify(body):undefined});return {status:r.status,data:await r.json(),headers:r.headers};}};}
+async function setup(options={}){const game=createGameServer({database:':memory:',origins:[origin],...options});game.server.listen(0,'127.0.0.1');await once(game.server,'listening');const base=`http://127.0.0.1:${game.server.address().port}`;return {game,base,async api(path,body,token){const r=await fetch(`${base}/api${path}`,{method:body?'POST':'GET',headers:{Origin:origin,...(body?{'Content-Type':'application/json'}:{}),...(token?{Authorization:`Bearer ${token}`}:{})},body:body?JSON.stringify(body):undefined});return {status:r.status,data:await r.json(),headers:r.headers};}};}
 test('accounts, hashing, login, sessions and leaderboard persist correctly',async()=>{const s=await setup();try{let r=await s.api('/auth/register',{nickname:'RiderOne',password:'correct-horse-987'});assert.equal(r.status,200);const token=r.data.token,user=r.data.user;assert(r.headers.get('set-cookie').includes('HttpOnly'));assert.notEqual(s.game.store.db.prepare('SELECT password FROM users').get().password,'correct-horse-987');assert.equal((await s.api('/auth/login',{nickname:'RiderOne',password:'bad'})).status,400);assert.equal((await s.api('/auth/login',{nickname:'riderone',password:'correct-horse-987'})).status,200);assert.equal((await s.api('/auth/register',{nickname:'RiderOne',password:'another-password'})).status,400);assert.equal((await s.api('/auth/me',null,token)).data.user.id,user.id);assert.equal((await s.api('/auth/me')).status,401);s.game.store.record(user.id,'cub',70);s.game.store.record(user.id,'cub',61);const rank=(await s.api('/leaderboard')).data.entries;assert.equal(rank[0].seconds,61);assert.equal(rank[0].laps,2);assert.equal((await s.api('/laps',{seconds:1},token)).status,404);await s.api('/auth/logout',{},token);assert.equal((await s.api('/auth/me',null,token)).status,401);}finally{await s.game.close();}});
 async function join(s,nickname,weather='clear'){const reg=await s.api('/auth/register',{nickname,password:'strong-password-987'});const ticket=(await s.api('/ws-ticket',{},reg.data.token)).data.ticket;const ws=new WebSocket(s.base.replace('http:','ws:')+`/ws?ticket=${ticket}`,{origin});await once(ws,'open');const received=[];ws.on('message',d=>received.push(JSON.parse(d)));const joined=once(ws,'message');ws.send(JSON.stringify({type:'join',room:'TEST-ROOM',bike:'cub',weather}));await joined;return {ws,received,id:reg.data.user.id};}
 test('two authenticated riders share authoritative state and input moves only the sender',async()=>{const s=await setup();try{const a=await join(s,'AliceRider'),b=await join(s,'BobRider');const before=s.game.rooms.get('TEST-ROOM').players.get(a.id).state.x;for(let seq=1;seq<=40;seq++){a.ws.send(JSON.stringify({type:'input',seq,throttle:1,steer:0}));await new Promise(r=>setTimeout(r,17));}const last=b.received.filter(m=>m.type==='state').at(-1);assert.equal(last.players.length,2);assert(last.players.find(p=>p.id===a.id).speed>2);assert(last.players.find(p=>p.id===b.id).speed<.1);assert(s.game.rooms.get('TEST-ROOM').players.get(a.id).state.x>before);a.ws.send(JSON.stringify({type:'lap',seconds:.1}));await new Promise(r=>setTimeout(r,60));assert.equal(s.game.store.leaderboard().length,0);a.ws.close();b.ws.close();}finally{await s.game.close();}});
@@ -72,4 +72,16 @@ test('open matchmaking and host-only synchronized countdown run on the authorita
   guest.ws.send(JSON.stringify({type:'lobby'}));await new Promise(resolve=>setTimeout(resolve,40));assert.equal(room.phase,'finished');host.ws.send(JSON.stringify({type:'lobby'}));await new Promise(resolve=>setTimeout(resolve,60));assert.equal(room.phase,'lobby');
   for(const p of [a,b,host,guest])p.ws.close();
  }finally{await s.game.close();}
+});
+
+test('Railway client IP quotas are separate only when edge trust is explicitly enabled',async()=>{
+ for(const trustRailway of [false,true]){
+  const s=await setup({trustRailway});try{
+   const attempt=ip=>fetch(`${s.base}/api/auth/register`,{method:'POST',headers:{Origin:origin,'Content-Type':'application/json','X-Real-IP':ip},body:'{}'});
+   for(let i=0;i<12;i++)assert.equal((await attempt('192.0.2.1')).status,400);
+   assert.equal((await attempt('192.0.2.1')).status,429);
+   assert.equal((await attempt('192.0.2.2')).status,trustRailway?400:429);
+   assert.equal((await attempt('2001:db8::1')).status,trustRailway?400:429);
+  }finally{await s.game.close();}
+ }
 });
