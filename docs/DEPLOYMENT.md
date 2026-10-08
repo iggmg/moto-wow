@@ -60,7 +60,7 @@ database.close();
 
 ## Railway: первый онлайн-сервер
 
-Один контейнер из `iggmg/moto-wow`, Dockerfile и `railway.json`, без serverless/sleep и без дополнительных replicas. Регион Singapore для первой проверки. Постоянный volume 0.5 GB монтировать в `/data` **до** первого запуска регистрации.
+Один контейнер из `iggmg/moto-wow`, Dockerfile, без serverless/sleep и без дополнительных replicas. Регион Singapore для первой проверки. Настройки нового сервиса задаются в панели Railway: healthcheck `/api/health`, timeout 120 секунд, restart On Failure с максимумом 3 попытки. Config as Code для новых сервисов недоступен с 28.08.2026. Постоянный volume 0.5 GB монтировать в `/data` **до** первого запуска регистрации.
 
 Переменные:
 
