@@ -127,3 +127,12 @@ test('authoritative rear brake shares grip loss, rejects invalid pedal values an
   a.ws.send(JSON.stringify({type:'input',seq:3,rearBrake:0,steer:0}));await new Promise(r=>setTimeout(r,350));assert(player.state.rearBrake<.02);const archive=(await s.api('/leaderboard?physics=10')).data;assert.equal(archive.context.physicsVersion,10);a.ws.close();b.ws.close();
  }finally{await s.game.close();}
 });
+
+test('server owns offroad penalties and scenery impacts, shares them with peers and preserves rules-eleven archive',async()=>{
+ const s=await setup();try{const a=await join(s,'VergeOne','snow',{trackId:'meadow'}),b=await join(s,'VergeTwo','snow',{trackId:'meadow'}),room=s.game.rooms.get('TEST-ROOM'),own=room.players.get(a.id).state,p=trackPoint(.04,'meadow'),yaw=trackHeading(.04,'meadow');room.orcs=[];
+ const x=p.x+Math.cos(yaw)*17,z=p.z-Math.sin(yaw)*17;Object.assign(own,{x,z,y:groundHeight(x,z,'meadow'),speed:0,health:100,hitCooldown:0});
+ a.ws.send(JSON.stringify({type:'penalty',penalty:0,offRoad:false}));await new Promise(r=>setTimeout(r,1250));assert(own.offRoad);assert.equal(own.offRoadPenalty,3);assert.equal(own.penalty,3);assert(b.received.some(m=>m.players?.some(p=>p.id===a.id&&p.offRoad&&p.offRoadPenalty===3)));
+ const o=trackData('meadow').SCENERY_ROCKS.find(o=>o.radius>1),impactZ=o.z-o.radius-.7;Object.assign(own,{x:o.x,z:impactZ,y:groundHeight(o.x,impactZ,'meadow'),yaw:0,travelYaw:0,speed:16,hitCooldown:0,obstacleContact:null,airborne:false});await new Promise(r=>setTimeout(r,160));assert.equal(own.lastDamage.type,'rock');assert(own.health<100);assert(b.received.some(m=>m.players?.some(p=>p.id===a.id&&p.lastDamage?.type==='rock'&&p.health<100)));
+ assert.equal((await s.api('/leaderboard?physics=11')).data.context.physicsVersion,11);a.ws.close();b.ws.close();
+ }finally{await s.game.close();}
+});

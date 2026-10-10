@@ -1,5 +1,5 @@
 {
-  "physicsVersion": 11,
+  "physicsVersion": 12,
   "calibration": "Useful-pace steering pilot (target >=4 m/s), ordinary controls and inside the road; isolated from enemy damage. Gold = ceil(reference × 1.12 + 4), silver × 1.35 + 10, bronze × 1.65 + 20.",
   "thresholds": {
     "rift": {

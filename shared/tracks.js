@@ -1,4 +1,4 @@
-export const DEFAULT_TRACK='rift',PHYSICS_VERSION=11,CHECKPOINTS=16;
+export const DEFAULT_TRACK='rift',PHYSICS_VERSION=12,CHECKPOINTS=16;
 export const TRACKS=[
  {id:'rift',name:'Сумеречный Разлом',difficulty:'Средняя',description:'Лесные S-повороты, две тесные петли, грязь и прыжки.',revision:2,width:12,route:[[0,108],[55,108],[110,95],[132,60],[110,28],[60,12],[70,-18],[125,-32],[135,-78],[100,-112],[48,-100],[18,-62],[-20,-86],[-65,-112],[-119,-92],[-140,-48],[-111,-12],[-50,0],[-60,32],[-124,48],[-131,84],[-76,108],[-35,108]],relief:1,weather:'clear',biome:'forest',ramps:[.115,.505],rivers:[.285,.755],mud:[[.19,.27],[.61,.70]],sand:[[.375,.46]],obstacles:[.135,.175,.31,.36,.48,.54,.72,.79,.83,.9],orcs:[.045,.30,.43,.57,.73,.86]},
  {id:'meadow',name:'Изумрудная Долина',difficulty:'Лёгкая',description:'Плавные S-повороты и широкие дуги среди пологих холмов.',revision:2,width:18,route:[[0,95],[52,95],[100,78],[110,36],[98,8],[112,-34],[92,-82],[40,-100],[-10,-92],[-58,-104],[-110,-76],[-116,-30],[-101,0],[-110,38],[-90,80],[-45,95]],relief:.35,weather:'clear',biome:'meadow',ramps:[.46],rivers:[],mud:[[.64,.68]],sand:[],obstacles:[.18,.43,.78],orcs:[.07,.58,.84]},
@@ -32,9 +32,14 @@ export function trackData(id=DEFAULT_TRACK){
  const data={...config,TRACK:Array.from({length:256},(_,i)=>trackPoint(i/256,config.id)),GATES:Array.from({length:CHECKPOINTS},(_,i)=>({...trackPoint(i/CHECKPOINTS,config.id),t:i/CHECKPOINTS})),
  RAMPS:config.ramps.map((t,i)=>({...feature(t,i),width:config.width-4,length:config.id==='meadow'?10:9,height:config.id==='meadow'?1.3:2.2})),
  RIVERS:config.rivers.map((t,i)=>({...feature(t,i),width:7,length:82})),
- OBSTACLES:config.obstacles.map((t,i)=>{const p=feature(t,i),offset=(i%2?1:-1)*config.width*.24;return {...p,x:p.x+Math.cos(p.heading)*offset,z:p.z-Math.sin(p.heading)*offset,radius:i%2?1.6:1.2,type:i%2?'log':'rock'};}),
+ OBSTACLES:config.obstacles.map((t,i)=>{const p=feature(t,i),offset=(i%2?1:-1)*config.width*.24;return {...p,x:p.x+Math.cos(p.heading)*offset,z:p.z-Math.sin(p.heading)*offset,radius:i%2?1.6:1.2,height:i%2?.9:1.65,type:i%2?'log':'rock'};}),
  ORCS:config.orcs.map((t,i)=>({...feature(t,i),trackId:config.id}))};
- data.length=routeData(config.id).length;data.bounds={minX:Math.min(...data.TRACK.map(p=>p.x)),maxX:Math.max(...data.TRACK.map(p=>p.x)),minZ:Math.min(...data.TRACK.map(p=>p.z)),maxZ:Math.max(...data.TRACK.map(p=>p.z))};cache.set(config.id,data);return data;
+ data.length=routeData(config.id).length;data.bounds={minX:Math.min(...data.TRACK.map(p=>p.x)),maxX:Math.max(...data.TRACK.map(p=>p.x)),minZ:Math.min(...data.TRACK.map(p=>p.z)),maxZ:Math.max(...data.TRACK.map(p=>p.z))};cache.set(config.id,data);
+ // One deterministic set is rendered and collided on desktop, mobile and the server.
+ let seed=Array.from(config.id).reduce((n,c)=>(n*31+c.charCodeAt(0))>>>0,719);const rnd=()=>{seed=(seed*1664525+1013904223)>>>0;return seed/4294967296;};
+ data.SCENERY_ROCKS=[];
+ for(let i=0;i<260;i++){const x=(rnd()-.5)*420,z=(rnd()-.5)*320,size=.7+rnd()*2.1,radius=size*.9,rotation=[0,rnd()*Math.PI*2,0];if(riverAt(x,z,config.id)||nearestTrack(x,z,config.id).distance<config.width/2+2+radius)continue;const o={id:data.OBSTACLES.length,type:'rock',scenery:true,x,z,radius,height:size*1.05,baseOffset:size*.25,scale:[size,size*.65,size*.8],rotation};data.SCENERY_ROCKS.push(o);data.OBSTACLES.push(o);}
+ return data;
 }
 export function nearestTrack(x,z,id=DEFAULT_TRACK){const points=trackData(id).TRACK;let d=Infinity,index=0,tx=0,tz=0;
  let progress=0;for(let i=0;i<points.length;i++){const a=points[i],b=points[(i+1)%points.length],dx=b.x-a.x,dz=b.z-a.z,f=Math.max(0,Math.min(1,((x-a.x)*dx+(z-a.z)*dz)/(dx*dx+dz*dz))),px=a.x+f*dx,pz=a.z+f*dz,ds=(px-x)**2+(pz-z)**2;if(ds<d){d=ds;index=i;progress=f;tx=px;tz=pz;}}
@@ -53,7 +58,7 @@ export function riverAt(x,z,id=DEFAULT_TRACK){return trackData(id).RIVERS.find(r
 export function naturalHeight(x,z,id=DEFAULT_TRACK){return trackById(id).relief*(1.3*Math.sin(x*.026)+2.3*Math.cos(z*.032)+1.1*Math.sin((x+z)*.043));}
 export function baseHeight(x,z,id=DEFAULT_TRACK){const river=riverAt(x,z,id);if(!river)return naturalHeight(x,z,id);const q=featureCoords(river,x,z),bank=Math.min(1,Math.abs(q.along)/(river.width/2));return naturalHeight(x,z,id)-.38*(1-bank**6);}
 export function groundHeight(x,z,id=DEFAULT_TRACK){const ramp=rampAt(x,z,id);return baseHeight(x,z,id)+(ramp?(ramp.along+ramp.length/2)/ramp.length*ramp.height:0);}
-export function surfaceAt(x,z,weather='clear',id=DEFAULT_TRACK){const n=nearestTrack(x,z,id),track=trackById(id),inside=segments=>segments.some(([a,b])=>n.t>a&&n.t<b),name=rampAt(x,z,id)?'ramp':riverAt(x,z,id)?'water':n.distance>track.width/2?(weather==='snow'?'snow':'grass'):inside(track.sand)?'sand':inside(track.mud)?'mud':weather==='snow'?'snow':'dirt';return {...n,name};}
+export function surfaceAt(x,z,weather='clear',id=DEFAULT_TRACK){const n=nearestTrack(x,z,id),track=trackById(id),inside=segments=>segments.some(([a,b])=>n.t>a&&n.t<b),name=rampAt(x,z,id)?'ramp':riverAt(x,z,id)?'water':n.distance>track.width/2?(weather==='snow'?'snow':'grass'):inside(track.sand)?'sand':inside(track.mud)?'mud':weather==='snow'?'snow':'dirt';return {...n,name,offRoad:n.distance>track.width/2};}
 // Default course exports for tools; historical results are kept separately.
 export const {TRACK,GATES,RAMPS,RIVERS,OBSTACLES,ORCS}=trackData();
 export const TRACK_WIDTH=trackById(DEFAULT_TRACK).width;

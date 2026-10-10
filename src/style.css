@@ -46,3 +46,7 @@ button{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-web
 @media(max-width:640px),(pointer:coarse){.hud-bottom{bottom:calc(max(16px,env(safe-area-inset-bottom)) + 124px)}}
 @media(max-width:360px){.touch-controls .touch-steering button{width:54px}.touch-controls .touch-pedals{grid-template-columns:60px 72px;gap:6px}.touch-controls .touch-pedals button{width:60px}.touch-controls .touch-pedals [data-control=throttle]{width:72px;height:110px}}
 @media(max-height:540px) and (orientation:landscape) and (pointer:coarse){.touch-controls .touch-pedals{grid-template-rows:44px 44px}.touch-controls .touch-pedals button{height:44px}.touch-controls .touch-pedals [data-control=throttle]{height:96px}.hud-bottom{bottom:calc(max(10px,env(safe-area-inset-bottom)) + 108px)}}
+
+.offroad-feedback{position:absolute;top:23%;left:50%;transform:translateX(-50%);width:max-content;max-width:88vw;padding:8px 12px;border:1px solid #ffc779;border-radius:10px;background:#372b19ed;color:#ffdc94;font-size:12px;font-weight:700;text-align:center;pointer-events:none}.offroad-feedback[hidden]{display:none}
+@media(max-width:640px) and (orientation:portrait){.offroad-feedback{top:max(340px,45vh);font-size:11px}}
+@media(max-height:540px) and (orientation:landscape){.offroad-feedback{top:auto;bottom:124px;font-size:10px;max-width:55vw}}
