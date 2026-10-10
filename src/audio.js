@@ -27,11 +27,11 @@ export class RaceAudio {
     this.roadFilter=c.createBiquadFilter();this.roadFilter.type='bandpass';this.roadFilter.Q.value=.6;
     this.roadGain=c.createGain();this.roadGain.gain.value=0;this.noise.connect(this.roadFilter);this.roadFilter.connect(this.roadGain);this.roadGain.connect(this.master);
     this.windFilter=c.createBiquadFilter();this.windFilter.type='lowpass';this.windFilter.frequency.value=600;
-    this.windGain=c.createGain();this.windGain.gain.value=0;this.noise.connect(this.windFilter);this.windFilter.connect(this.windGain);this.windGain.connect(this.master);this.noise.start();
+    this.windGain=c.createGain();this.windGain.gain.value=0;this.noise.connect(this.windFilter);this.windFilter.connect(this.windGain);this.windGain.connect(this.master);this.skidFilter=c.createBiquadFilter();this.skidFilter.type='bandpass';this.skidFilter.frequency.value=2000;this.skidFilter.Q.value=1.8;this.skidGain=c.createGain();this.skidGain.gain.value=0;this.noise.connect(this.skidFilter);this.skidFilter.connect(this.skidGain);this.skidGain.connect(this.master);this.noise.start();
     this.lastHits=0;c.resume();
   }
   toggle(){this.unlock();this.configure({effects:!this.enabled});if(!this.enabled)this.silence();return this.enabled;}
-  silence(){if(!this.context)return;for(const g of [this.motorGain,this.mechanicsGain,this.roadGain,this.windGain])g.gain.setTargetAtTime(0,this.context.currentTime,.08);}
+  silence(){if(!this.context)return;for(const g of [this.motorGain,this.mechanicsGain,this.roadGain,this.windGain,this.skidGain])g.gain.setTargetAtTime(0,this.context.currentTime,.08);}
   update(state,input,time,running,weather='clear'){
     this.active=running&&!state.finished;if(!this.context)return;const visible=!document.hidden;this.music.set({enabled:this.settings.music,track:this.settings.track,volume:this.settings.musicVolume,active:this.active&&visible});if(!visible||!running||!this.enabled){this.silence();return;}
     const c=this.context,t=c.currentTime,speed=state.speed,load=input.throttle||0;
@@ -46,6 +46,7 @@ export class RaceAudio {
     this.roadFilter.frequency.setTargetAtTime(state.surface==='mud'?180:state.surface==='grass'||state.surface==='snow'?650:state.surface==='sand'?450:state.surface==='water'?1100:1800,t,.15);
     this.roadGain.gain.setTargetAtTime((state.airborne?0:Math.min(.17,speed*.004))*(state.surface==='water'?1.6:state.surface==='mud'?1.2:1),t,.1);
     this.windGain.gain.setTargetAtTime(Math.min(.18,speed*speed*.0001+(weather==='rain'?.10:weather==='snow'?.025:0)),t,.2);
+    const skid=state.airborne?0:Math.min(.14,Math.abs(state.slipAngle||0)*speed*.015+(state.rearBrake||0)*Math.min(.06,speed*.003));this.skidFilter.frequency.setTargetAtTime(state.surface==='snow'?800:state.surface==='mud'?450:1900,t,.08);this.skidGain.gain.setTargetAtTime(skid,t,.06);
     if(state.hits>this.lastHits)this.impact();this.lastHits=state.hits;
   }
   impact(){const c=this.context,source=c.createBufferSource();source.buffer=this.noise.buffer;const f=c.createBiquadFilter();f.type='lowpass';f.frequency.value=900;const g=c.createGain();g.gain.setValueAtTime(.8,c.currentTime);g.gain.exponentialRampToValueAtTime(.001,c.currentTime+.35);source.connect(f);f.connect(g);g.connect(this.master);source.start();source.stop(c.currentTime+.4);source.onended=()=>{source.disconnect();f.disconnect();g.disconnect();};}

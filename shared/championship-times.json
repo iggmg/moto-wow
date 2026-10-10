@@ -1,157 +1,157 @@
 {
-  "physicsVersion": 10,
-  "calibration": "Safe steering pilot, ordinary controls; isolated from enemy damage. Gold = ceil(reference × 1.12 + 4), silver × 1.35 + 10, bronze × 1.65 + 20.",
+  "physicsVersion": 11,
+  "calibration": "Useful-pace steering pilot (target >=4 m/s), ordinary controls and inside the road; isolated from enemy damage. Gold = ceil(reference × 1.12 + 4), silver × 1.35 + 10, bronze × 1.65 + 20.",
   "thresholds": {
     "rift": {
       "cub": {
-        "gold": 171,
-        "silver": 211,
-        "bronze": 266,
-        "reference": 148.53
+        "gold": 122,
+        "silver": 152,
+        "bronze": 194,
+        "reference": 105.17
       },
       "exciter": {
-        "gold": 180,
-        "silver": 223,
-        "bronze": 280,
-        "reference": 157.12
+        "gold": 121,
+        "silver": 151,
+        "bronze": 192,
+        "reference": 103.85
       },
       "himalayan": {
-        "gold": 203,
-        "silver": 249,
-        "bronze": 312,
-        "reference": 176.93
+        "gold": 121,
+        "silver": 151,
+        "bronze": 192,
+        "reference": 104.12
       },
       "winner": {
-        "gold": 173,
-        "silver": 214,
-        "bronze": 269,
-        "reference": 150.7
+        "gold": 121,
+        "silver": 151,
+        "bronze": 192,
+        "reference": 103.73
       },
       "pcx": {
-        "gold": 190,
-        "silver": 234,
-        "bronze": 294,
-        "reference": 165.7
+        "gold": 123,
+        "silver": 154,
+        "bronze": 195,
+        "reference": 106.05
       },
       "mt07": {
-        "gold": 192,
-        "silver": 236,
-        "bronze": 296,
-        "reference": 166.98
+        "gold": 120,
+        "silver": 150,
+        "bronze": 191,
+        "reference": 103.28
       }
     },
     "meadow": {
       "cub": {
-        "gold": 103,
-        "silver": 129,
-        "bronze": 165,
-        "reference": 87.53
+        "gold": 78,
+        "silver": 99,
+        "bronze": 129,
+        "reference": 65.62
       },
       "exciter": {
-        "gold": 108,
-        "silver": 135,
-        "bronze": 172,
-        "reference": 92.02
+        "gold": 77,
+        "silver": 98,
+        "bronze": 127,
+        "reference": 64.82
       },
       "himalayan": {
-        "gold": 120,
-        "silver": 149,
-        "bronze": 190,
-        "reference": 102.78
+        "gold": 77,
+        "silver": 98,
+        "bronze": 128,
+        "reference": 65.13
       },
       "winner": {
-        "gold": 104,
-        "silver": 130,
-        "bronze": 167,
-        "reference": 88.73
+        "gold": 77,
+        "silver": 98,
+        "bronze": 128,
+        "reference": 64.85
       },
       "pcx": {
-        "gold": 112,
-        "silver": 140,
-        "bronze": 178,
-        "reference": 95.65
+        "gold": 78,
+        "silver": 99,
+        "bronze": 129,
+        "reference": 65.55
       },
       "mt07": {
-        "gold": 113,
-        "silver": 142,
-        "bronze": 181,
-        "reference": 97.25
+        "gold": 77,
+        "silver": 98,
+        "bronze": 127,
+        "reference": 64.5
       }
     },
     "canyon": {
       "cub": {
-        "gold": 249,
-        "silver": 305,
-        "bronze": 381,
-        "reference": 218.5
+        "gold": 151,
+        "silver": 187,
+        "bronze": 236,
+        "reference": 130.7
       },
       "exciter": {
-        "gold": 267,
-        "silver": 326,
-        "bronze": 407,
-        "reference": 234
+        "gold": 148,
+        "silver": 183,
+        "bronze": 232,
+        "reference": 127.95
       },
       "himalayan": {
-        "gold": 308,
-        "silver": 377,
-        "bronze": 468,
-        "reference": 271.37
+        "gold": 148,
+        "silver": 184,
+        "bronze": 232,
+        "reference": 128.28
       },
       "winner": {
-        "gold": 253,
-        "silver": 310,
-        "bronze": 386,
-        "reference": 221.53
+        "gold": 148,
+        "silver": 183,
+        "bronze": 231,
+        "reference": 127.82
       },
       "pcx": {
-        "gold": 289,
-        "silver": 354,
-        "bronze": 440,
-        "reference": 254.4
+        "gold": 154,
+        "silver": 191,
+        "bronze": 241,
+        "reference": 133.75
       },
       "mt07": {
-        "gold": 287,
-        "silver": 351,
-        "bronze": 436,
-        "reference": 252.1
+        "gold": 147,
+        "silver": 182,
+        "bronze": 230,
+        "reference": 126.97
       }
     },
     "summit": {
       "cub": {
-        "gold": 325,
-        "silver": 396,
-        "bronze": 492,
-        "reference": 285.77
+        "gold": 208,
+        "silver": 256,
+        "bronze": 321,
+        "reference": 181.9
       },
       "exciter": {
-        "gold": 347,
-        "silver": 424,
-        "bronze": 525,
-        "reference": 305.95
+        "gold": 207,
+        "silver": 254,
+        "bronze": 319,
+        "reference": 180.72
       },
       "himalayan": {
-        "gold": 396,
-        "silver": 483,
-        "bronze": 598,
-        "reference": 349.97
+        "gold": 208,
+        "silver": 255,
+        "bronze": 320,
+        "reference": 181.4
       },
       "winner": {
-        "gold": 332,
-        "silver": 405,
-        "bronze": 502,
-        "reference": 292.08
+        "gold": 207,
+        "silver": 255,
+        "bronze": 319,
+        "reference": 180.78
       },
       "pcx": {
-        "gold": 362,
-        "silver": 442,
-        "bronze": 548,
-        "reference": 319.43
+        "gold": 208,
+        "silver": 256,
+        "bronze": 320,
+        "reference": 181.73
       },
       "mt07": {
-        "gold": 372,
-        "silver": 453,
-        "bronze": 562,
-        "reference": 327.88
+        "gold": 206,
+        "silver": 254,
+        "bronze": 318,
+        "reference": 180.32
       }
     }
   }

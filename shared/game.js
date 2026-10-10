@@ -1,8 +1,8 @@
 import { friendlyTo,strikeOrc } from './arcade.js';
 import { damageRider } from './health.js';
-export const VERSION = 10;
+export const VERSION = 11;
 export const STEP = 1 / 60;
-import {DEFAULT_TRACK,PHYSICS_VERSION,CHECKPOINTS,trackData,trackById,trackPoint,trackHeading,groundHeight,baseHeight,rampAt,featureCoords,surfaceAt,ORCS} from './tracks.js';
+import {DEFAULT_TRACK,PHYSICS_VERSION,CHECKPOINTS,trackData,trackById,trackPoint,trackHeading,nearestTrack,groundHeight,baseHeight,rampAt,featureCoords,surfaceAt,ORCS} from './tracks.js';
 export * from './tracks.js';
 export const BIKES = [
   { id:'cub', name:'Honda CUB', type:'Классика · тёмный кузов, кремовый щит', color:0x172b27, maxSpeed:24, acceleration:5.5, handling:1.2, mudGrip:.68, wheel:.30, wheelbase:1.22, seatY:.75, mass:110, label:'CUB', class:'underbone' },
@@ -17,6 +17,16 @@ export const clamp = (v,a,b) => Math.max(a, Math.min(b,v));
 export const angleDiff = (a,b) => Math.atan2(Math.sin(a-b), Math.cos(a-b));
 export const WEATHER=['clear','rain','snow'];
 export const WEATHER_LABELS={clear:'Ясно',rain:'Дождь',snow:'Снег'};
+// Advice only: this never modifies steering, throttle or checkpoint progress.
+export function cornerAdvice(s,weather='clear'){
+  const id=s.trackId||DEFAULT_TRACK,data=trackData(id),near=nearestTrack(s.x,s.z,id);let bend=0,turn=0;
+  for(let distance=5;distance<=Math.max(20,Math.min(45,s.speed*2));distance+=5){
+    const curve=angleDiff(trackHeading(near.t+(distance+3)/data.length,id),trackHeading(near.t+(distance-3)/data.length,id))/6;
+    if(Math.abs(curve)>bend){bend=Math.abs(curve);turn=Math.sign(curve);}
+  }
+  const speed=clamp(Math.sqrt((weather==='snow'?4.5:weather==='rain'?5.5:7)/Math.max(.008,bend))*.78,4,bikeById(s.bike).maxSpeed);
+  return {tight:bend>.025,brake:bend>.015&&s.speed>speed+1,speed,side:turn<0?'направо':'налево'};
+}
 export function orcPosition(orc,time) {
   const cross=Math.sin(time*.65+orc.id*1.7)*8;
   return {x:orc.x+Math.cos(orc.heading)*cross,z:orc.z-Math.sin(orc.heading)*cross};
@@ -57,16 +67,16 @@ export function stepOrcs(orcs,riders,dt=STEP,time=0) {
 }
 export function createRider(bike='cub',slot=0,trackId=DEFAULT_TRACK) {
   trackId=trackById(trackId).id;const p=trackPoint(0,trackId),yaw=trackHeading(0,trackId),offset=(slot%4-1.5)*2;
-  return {trackId,trackRevision:trackById(trackId).revision,physicsVersion:PHYSICS_VERSION,contactShield:2,contactVX:0,contactVZ:0,health:100,lastDamage:null,finished:false,raceTime:0,totalPenalty:0,lapLimit:0,bike,x:p.x+Math.cos(yaw)*offset,z:p.z-Math.sin(yaw)*offset-(Math.floor(slot/4)*3),yaw,travelYaw:yaw,slipAngle:0,obstacleContact:null,speed:0,steer:0,y:groundHeight(p.x,p.z,trackId),vy:0,nextGate:1,lap:1,lapTime:0,best:0,last:0,hits:0,hitCooldown:0,surface:'dirt',distance:0,completed:0,penalty:0,airborne:false,lastRamp:null};
+  return {trackId,trackRevision:trackById(trackId).revision,physicsVersion:PHYSICS_VERSION,contactShield:2,contactVX:0,contactVZ:0,health:100,lastDamage:null,finished:false,raceTime:0,totalPenalty:0,lapLimit:0,bike,x:p.x+Math.cos(yaw)*offset,z:p.z-Math.sin(yaw)*offset-(Math.floor(slot/4)*3),yaw,travelYaw:yaw,slipAngle:0,obstacleContact:null,speed:0,steer:0,rearBrake:0,yawRate:0,lean:0,pitch:0,y:groundHeight(p.x,p.z,trackId),vy:0,nextGate:1,lap:1,lapTime:0,best:0,last:0,hits:0,hitCooldown:0,surface:'dirt',distance:0,completed:0,penalty:0,airborne:false,lastRamp:null};
 }
 export function resetRider(s) {
   if(s.health===0||s.finished)return;
   const gate=Math.max(0,s.nextGate-1),t=gate/CHECKPOINTS,p=trackPoint(t,s.trackId);
-  if(s.arcade&&s.arcade.fuel===0)s.arcade.fuel=20;s.contactShield=2;s.contactVX=0;s.contactVZ=0;s.x=p.x;s.z=p.z;s.yaw=trackHeading(t,s.trackId);s.travelYaw=s.yaw;s.slipAngle=0;s.obstacleContact=null;s.speed=0;s.y=groundHeight(p.x,p.z,s.trackId);s.vy=0;s.airborne=false;s.lastRamp=null;s.penalty+=5;s.totalPenalty=(s.totalPenalty||0)+5;
+  if(s.arcade&&s.arcade.fuel===0)s.arcade.fuel=20;s.contactShield=2;s.contactVX=0;s.contactVZ=0;s.x=p.x;s.z=p.z;s.yaw=trackHeading(t,s.trackId);s.travelYaw=s.yaw;s.slipAngle=0;s.obstacleContact=null;s.rearBrake=0;s.yawRate=0;s.lean=0;s.pitch=0;s.speed=0;s.y=groundHeight(p.x,p.z,s.trackId);s.vy=0;s.airborne=false;s.lastRamp=null;s.penalty+=5;s.totalPenalty=(s.totalPenalty||0)+5;
 }
 export function normalizeInput(input={}) {
   if(!input||typeof input!=='object')input={};
-  return {throttle:clamp(Number(input.throttle)||0,0,1),brake:clamp(Number(input.brake)||0,0,1),steer:clamp(Number(input.steer)||0,-1,1)};
+  return {throttle:clamp(Number(input.throttle)||0,0,1),brake:clamp(Number(input.brake)||0,0,1),rearBrake:clamp(Number(input.rearBrake)||0,0,1),steer:clamp(Number(input.steer)||0,-1,1)};
 }
 export function stepRider(s,rawInput,dt=STEP,time=0,orcs=null,weather='clear') {
   if(s.health===0||s.finished){s.speed=0;return null;}
@@ -82,12 +92,20 @@ export function stepRider(s,rawInput,dt=STEP,time=0,orcs=null,weather='clear') {
   const previous={x:s.x,z:s.z};
   if(s.speed<.5||!Number.isFinite(s.travelYaw))s.travelYaw=s.yaw;
   const resistance=.3+s.speed*s.speed*.004+drag;
-  s.speed=clamp(s.speed+(input.throttle*bike.acceleration*driveGrip*(boost?1.8:1)-input.brake*14-resistance)*dt,0,max);
-  s.steer+=(input.steer-s.steer)*Math.min(1,dt*7);
-  s.yaw-=s.steer*(s.airborne?.15:1)*bike.handling*(.35+s.speed*.042)/(1+s.speed*.018)*dt*Math.sqrt(grip);
-  // Lateral tyre response preserves the direction of momentum on slippery ground.
-  // Low-speed assistance keeps uphill starts and tight hairpins controllable.
-  if(!s.airborne){const traction=12*grip*grip+Math.max(0,10-s.speed)*2;s.travelYaw+=angleDiff(s.yaw,s.travelYaw)*(1-Math.exp(-traction*dt));}
+  s.rearBrake=((s.rearBrake||0)+(input.rearBrake-(s.rearBrake||0))*(1-Math.exp(-dt*12)));
+  const braking=Math.min(20,input.brake*14+s.rearBrake*8),drive=input.throttle*(1-.75*Math.max(input.brake,s.rearBrake));
+  // Neither brake acts on airborne wheels; grip and tyre effects resume on landing.
+  s.speed=clamp(s.speed+(drive*bike.acceleration*driveGrip*(boost?1.8:1)-(s.airborne?0:braking)-resistance)*dt,0,max);
+  s.steer+=(input.steer-s.steer)*(1-Math.exp(-dt*11));
+  const authority=bike.handling*((.35+s.speed*.042)/(1+s.speed*.018)+.75/(1+(s.speed/12)**2))*Math.sqrt(.65+.35*grip);
+  const rate=Math.min(authority,(11+s.speed*.25)/Math.max(1,s.speed));
+  s.yawRate=-s.steer*rate*clamp(s.speed/2,0,1)*(s.airborne?.15:1)*(1+.22*s.rearBrake);
+  s.yaw+=s.yawRate*dt;
+  // Rear braking breaks lateral grip progressively, not by adding a scripted spin.
+  // Releasing it recovers traction while preserving the current travel direction.
+  if(!s.airborne){const traction=(12*grip*grip+Math.max(0,10-s.speed)*2)*(1-.8*s.rearBrake)*(1+input.brake*.25);s.travelYaw+=angleDiff(s.yaw,s.travelYaw)*(1-Math.exp(-traction*dt));}
+  const lean=s.airborne?0:-Math.atan2(s.speed*s.yawRate,9.81)*.65,pitch=s.airborne?0:input.brake*.11+s.rearBrake*.05-drive*.035;
+  s.lean=(s.lean||0)+(lean-(s.lean||0))*(1-Math.exp(-dt*7));s.pitch=(s.pitch||0)+(pitch-(s.pitch||0))*(1-Math.exp(-dt*7));
   s.slipAngle=angleDiff(s.travelYaw,s.yaw);
   const dx=Math.sin(s.travelYaw)*s.speed*dt,dz=Math.cos(s.travelYaw)*s.speed*dt;
   s.x+=dx+(s.contactVX||0)*dt;s.z+=dz+(s.contactVZ||0)*dt;s.contactVX=(s.contactVX||0)*Math.exp(-dt*6);s.contactVZ=(s.contactVZ||0)*Math.exp(-dt*6);s.distance+=Math.hypot(dx,dz);

@@ -1,4 +1,5 @@
 import test from 'node:test';
+import {driveHandlingLap} from './helpers/handling-pilot.js';
 import assert from 'node:assert/strict';
 import {mkdtempSync,rmSync} from 'node:fs';
 import {tmpdir} from 'node:os';
@@ -28,15 +29,10 @@ test('database migration retains old laps and partitions course, weather, mode a
  assert.equal(store.leaderboard()[0].seconds,70);assert.equal(store.leaderboard(null,{trackId:'meadow'})[0].seconds,80);assert.equal(store.leaderboard(null,{weather:'snow'})[0].seconds,90);assert.equal(store.leaderboard(null,{mode:'race'})[0].seconds,100);assert.equal(store.leaderboard(null,legacy)[0].seconds,12);
  }finally{store?.close();rmSync(dir,{recursive:true,force:true});}
 });
-test('every motorcycle can drive a complete lap of every course using ordinary throttle, brake and steering',()=>{
- // Isolate route geometry from enemy/impact damage, covered by combat tests.
- for(const track of TRACKS)for(const bike of BIKES){const data=trackData(track.id),s=createRider(bike.id,0,track.id);s.hitCooldown=9999;let widest=0;
-  for(let i=0;i<36000&&!s.completed;i++){
-   const n=nearestTrack(s.x,s.z,track.id),p=trackPoint(n.t+5/data.length,track.id),angle=angleDiff(Math.atan2(p.x-s.x,p.z-s.z),s.yaw);let bend=0;
-   for(const distance of [5,10,15,20])bend=Math.max(bend,Math.abs(angleDiff(trackHeading(n.t+(distance+3)/data.length,track.id),trackHeading(n.t+(distance-3)/data.length,track.id)))/6);
-   const grip=track.weather==='snow'?.45:track.weather==='rain'?.55:.85,target=clamp((bike.handling*.35*grip)/(Math.max(.008,bend)*1.25),1.1,track.id==='summit'?7:10);
-   widest=Math.max(widest,n.distance);stepRider(s,{throttle:s.speed<target?1:0,brake:s.speed>target+.15?.5:0,steer:clamp(-angle*5,-1,1)},STEP,i*STEP,[],track.weather);
-  }assert.equal(s.completed,1,`${track.id}/${bike.id} reaches finish`);assert(widest<=track.width/2,`${track.id}/${bike.id} stays inside the road`);
+test('all 72 bike/course/weather combinations complete inside the road at useful pace without rear brake or resets',()=>{
+ for(const track of TRACKS)for(const bike of BIKES)for(const weather of ['clear','rain','snow']){
+  const {state,widest,average}=driveHandlingLap(bike,track,weather),label=`${track.id}/${bike.id}/${weather}`;
+  assert.equal(state.completed,1,`${label} reaches finish`);assert(widest<=track.width/2,`${label} stays inside the road: ${widest}`);assert(average>4,`${label} average pace exceeds 14.4 km/h`);
  }
 });
 test('winding routes change turn direction, leave clearance between arms and never cross road edges',()=>{
