@@ -1,6 +1,6 @@
 import { friendlyTo,strikeOrc } from './arcade.js';
 import { damageRider } from './health.js';
-export const VERSION = 12;
+export const VERSION = 13;
 export const STEP = 1 / 60;
 import {DEFAULT_TRACK,PHYSICS_VERSION,CHECKPOINTS,trackData,trackById,trackPoint,trackHeading,nearestTrack,groundHeight,baseHeight,rampAt,featureCoords,surfaceAt,ORCS} from './tracks.js';
 export * from './tracks.js';
@@ -66,8 +66,8 @@ export function stepOrcs(orcs,riders,dt=STEP,time=0) {
   }
 }
 export function createRider(bike='cub',slot=0,trackId=DEFAULT_TRACK) {
-  trackId=trackById(trackId).id;const p=trackPoint(0,trackId),yaw=trackHeading(0,trackId),offset=(slot%4-1.5)*2;
-  return {trackId,trackRevision:trackById(trackId).revision,physicsVersion:PHYSICS_VERSION,contactShield:2,contactVX:0,contactVZ:0,health:100,lastDamage:null,finished:false,raceTime:0,totalPenalty:0,lapLimit:0,bike,x:p.x+Math.cos(yaw)*offset,z:p.z-Math.sin(yaw)*offset-(Math.floor(slot/4)*3),yaw,travelYaw:yaw,slipAngle:0,obstacleContact:null,speed:0,steer:0,rearBrake:0,yawRate:0,lean:0,pitch:0,y:groundHeight(p.x,p.z,trackId),vy:0,nextGate:1,lap:1,lapTime:0,best:0,last:0,hits:0,hitCooldown:0,surface:'dirt',offRoad:false,offRoadTime:0,roadRecovery:0,offRoadCharged:false,offRoadPenalty:0,offRoadPenaltyAt:-99,distance:0,completed:0,penalty:0,airborne:false,lastRamp:null};
+  trackId=trackById(trackId).id;const p=trackPoint(0,trackId),yaw=trackHeading(0,trackId),offset=(slot%4-1.5)*2,row=Math.floor(slot/4)*3,x=p.x+Math.cos(yaw)*offset-Math.sin(yaw)*row,z=p.z-Math.sin(yaw)*offset-Math.cos(yaw)*row;
+  return {trackId,trackRevision:trackById(trackId).revision,physicsVersion:PHYSICS_VERSION,contactShield:2,contactVX:0,contactVZ:0,health:100,lastDamage:null,finished:false,raceTime:0,totalPenalty:0,lapLimit:0,bike,x,z,yaw,travelYaw:yaw,slipAngle:0,obstacleContact:null,speed:0,steer:0,rearBrake:0,yawRate:0,lean:0,pitch:0,y:groundHeight(x,z,trackId),vy:0,nextGate:1,lap:1,lapTime:0,best:0,last:0,hits:0,hitCooldown:0,surface:'dirt',offRoad:false,offRoadTime:0,roadRecovery:0,offRoadCharged:false,offRoadPenalty:0,offRoadPenaltyAt:-99,distance:0,completed:0,penalty:0,airborne:false,lastRamp:null};
 }
 export function resetRider(s) {
   if(s.health===0||s.finished)return;
@@ -95,7 +95,8 @@ export function stepRider(s,rawInput,dt=STEP,time=0,orcs=null,weather='clear') {
   s.rearBrake=((s.rearBrake||0)+(input.rearBrake-(s.rearBrake||0))*(1-Math.exp(-dt*12)));
   const braking=Math.min(20,input.brake*14+s.rearBrake*8),drive=input.throttle*(1-.75*Math.max(input.brake,s.rearBrake));
   // Neither brake acts on airborne wheels; grip and tyre effects resume on landing.
-  s.speed=clamp(s.speed+(drive*bike.acceleration*driveGrip*(boost?1.8:1)-(s.airborne?0:braking)-resistance)*dt,0,max);
+  if(s.airborne)s.speed=Math.max(0,s.speed*Math.exp(-dt*.02));
+  else {const acceleration=drive*bike.acceleration*driveGrip*(boost?1.8:1),overspeed=Math.max(0,s.speed-max)*2;s.speed=Math.max(0,s.speed+(Math.min(acceleration,Math.max(0,max-s.speed)/dt)-braking-resistance-overspeed)*dt);}
   s.steer+=(input.steer-s.steer)*(1-Math.exp(-dt*11));
   const authority=bike.handling*((.35+s.speed*.042)/(1+s.speed*.018)+.75/(1+(s.speed/12)**2))*Math.sqrt(.65+.35*grip)*(surface.offRoad?.72:1);
   const rate=Math.min(authority,(11+s.speed*.25)/Math.max(1,s.speed));
@@ -112,7 +113,7 @@ export function stepRider(s,rawInput,dt=STEP,time=0,orcs=null,weather='clear') {
   s.x=clamp(s.x,-220,220);s.z=clamp(s.z,-180,180);
   const gy=groundHeight(s.x,s.z,s.trackId),ramp=rampAt(s.x,s.z,s.trackId);
   const hill=baseHeight(s.x+Math.sin(s.travelYaw),s.z+Math.cos(s.travelYaw),s.trackId)-baseHeight(s.x,s.z,s.trackId);
-  if(s.speed>0&&!s.airborne)s.speed=clamp(s.speed-hill*2*dt,0,max);
+  if(s.speed>0&&!s.airborne)s.speed=Math.max(0,s.speed-hill*2*dt);
   if(!s.airborne&&ramp){s.lastRamp=ramp.id;s.y=gy;s.vy=0;}
   else if(!s.airborne&&s.lastRamp!==null){
     const last=RAMPS[s.lastRamp],q=featureCoords(last,s.x,s.z),forward=Math.cos(s.yaw-last.heading);
@@ -159,7 +160,10 @@ export function stepRider(s,rawInput,dt=STEP,time=0,orcs=null,weather='clear') {
   }
   if(s.health===0)return null;
   const gate=GATES[s.nextGate%CHECKPOINTS];
-  if(!s.offRoad&&Math.hypot(s.x-gate.x,s.z-gate.z)<10) {
+  const gateYaw=trackHeading(gate.t,s.trackId),gx=Math.sin(gateYaw),gz=Math.cos(gateYaw),before=(previous.x-gate.x)*gx+(previous.z-gate.z)*gz,after=(s.x-gate.x)*gx+(s.z-gate.z)*gz;
+  const crossing=before<=0&&after>0,at=crossing?-before/(after-before):0,crossX=previous.x+(s.x-previous.x)*at,crossZ=previous.z+(s.z-previous.z)*at;
+  // Ordered gate planes count actual forward travel, including legitimate jumps.
+  if(crossing&&!s.offRoad&&Math.abs((crossX-gate.x)*gz-(crossZ-gate.z)*gx)<=trackById(s.trackId).width/2) {
     s.nextGate++;
     if(s.nextGate>CHECKPOINTS) {
       s.last=s.lapTime+s.penalty;s.best=s.best?Math.min(s.best,s.last):s.last;

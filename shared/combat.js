@@ -26,6 +26,7 @@ export function stepCombat(combat,orcs,riders,dt=STEP,time=0){
   const before={x:p.x,y:p.y,z:p.z};p.x+=p.vx*dt;p.z+=p.vz*dt;p.y+=p.vy*dt-.5*p.gravity*dt*dt;p.vy-=p.gravity*dt;p.life-=dt;
   let hit=false;
   for(const rider of riders){
+   if(rider.finished||rider.health===0)continue;
    if(friendlyTo(orcs.find(o=>o.id===p.owner)||{},rider.id,time))continue;
    // Swept collision avoids arrows skipping a rider at low render rates.
    const dx=p.x-before.x,dy=p.y-before.y,dz=p.z-before.z,l=dx*dx+dy*dy+dz*dz;

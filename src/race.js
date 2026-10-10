@@ -1,3 +1,4 @@
+import {disposeBike} from './model-geometry.js';
 import {createTyreMarks} from './tyre-marks.js';
 import {createStunt,stepStunt,retryStunt,stuntLevel} from '../shared/stunt.js';
 import {createStuntView} from './stunt-view.js';
@@ -34,7 +35,7 @@ export class Race {
   }
   async loadManifest(){try{const response=await fetch(`${import.meta.env.BASE_URL}models/manifest.json`);if(response.ok)this.manifest=await response.json();}catch{/* Built-in meshes remain playable when optional assets are unavailable. */}}
   async createModel(bike,rider=true){
-    const entry=this.manifest?.[bike];if(entry?.file){try{const gltf=await new GLTFLoader().loadAsync(`${import.meta.env.BASE_URL}models/${entry.file}`);const root=gltf.scene;root.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;}});root.userData={wheels:[root.getObjectByName('WheelRear'),root.getObjectByName('WheelFront')].filter(Boolean),body:root.getObjectByName('BikeBody')||root};return root;}catch{this.onNotice?.('Модель загружается из встроенного набора.');}}
+    const entry=this.manifest?.[bike];if(entry?.file){try{const gltf=await new GLTFLoader().loadAsync(`${import.meta.env.BASE_URL}models/${entry.file}`);const root=gltf.scene;root.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;}});root.userData={ownedMaterials:true,wheels:[root.getObjectByName('WheelRear'),root.getObjectByName('WheelFront')].filter(Boolean),body:root.getObjectByName('BikeBody')||root};return root;}catch{this.onNotice?.('Модель загружается из встроенного набора.');}}
     return buildBike(bike,{rider});
   }
   resize(){const w=innerWidth,h=innerHeight;this.renderer.setSize(w,h,false);this.camera.aspect=w/h;this.camera.updateProjectionMatrix();}
@@ -43,7 +44,7 @@ export class Race {
     if(!connection&&this.practiceMode==='stunt')return this.startStunt(bike);
     this.audioSystem.unlock();this.exit(false);this.connection=connection;this.online=!!connection;this.seq=0;this.pending=[];this.lowFrames=0;this.gameTime=connection?.message.time||0;
     this.roomRace=connection?.message.race||null;await this.setTrack(this.roomRace?.trackId||this.practiceTrack||DEFAULT_TRACK);this.soloBike=bike;this.id=connection?.message.id??0;this.state=connection?{...connection.message.players.find(p=>p.id===this.id)}:createRider(bike,0,this.trackId);if(!connection)this.state.lapLimit=this.practiceLaps||3;this.state.id=this.id;this.damageHits=this.state.hits;this.damageUntil=0;this.gameMode=this.roomRace?.mode||this.practiceMode||'solo';if(!connection&&this.gameMode==='arcade')initArcade(this.state);this.arcade=connection?.message.arcade|| (this.gameMode==='arcade'?createArcade(this.trackId):null);this.arcadeView?.dispose();this.arcadeView=this.arcade?createArcadeView(this.scene,this.trackId):null;this.tyreMarks=createTyreMarks(this.scene,this.trackId);this.orcs=connection?.message.orcs?.map(o=>({...o}))||createOrcs(0,this.trackId);
-    this.combat=connection?.message.combat?structuredClone(connection.message.combat):createCombat();this.weather=connection?.message.weather||this.practiceWeather||'clear';await this.world.ready;this.scene.remove(this.player);this.scene.remove(this.cockpit);this.player=await this.createModel(bike);this.cockpit=buildBike(bike);this.scene.add(this.player,this.cockpit);this.keys.clear();this.touchControls?.clear();this.accumulator=0;this.startAt=performance.now()+(connection?0:3000);this.countdownDone=!!connection;
+    this.combat=connection?.message.combat?structuredClone(connection.message.combat):createCombat();this.weather=connection?.message.weather||this.practiceWeather||'clear';await this.world.ready;disposeBike(this.player);disposeBike(this.cockpit);this.player=await this.createModel(bike);this.cockpit=buildBike(bike);this.scene.add(this.player,this.cockpit);this.keys.clear();this.touchControls?.clear();this.accumulator=0;this.startAt=performance.now()+(connection?0:3000);this.countdownDone=!!connection;
     for(const selector of ['.lap-block','.health-block','.hud-left','.minimap-wrap'])document.querySelector(selector).hidden=false;
     this.running=true;document.body.classList.add('racing');$('garage').hidden=true;$('hud').hidden=false;$('race-mode').textContent=this.online?`ОНЛАЙН · ${connection.message.room}`:`${trackById(this.trackId).name.toUpperCase()} · ТРЕНИРОВКА`;$('riding-bike').textContent=BIKES.find(b=>b.id===bike).name;document.querySelector('[data-control=rearBrake]').hidden=false;
     if(connection)this.receive(connection.message);this.applyCamera(true);this.updateHUD();
@@ -62,13 +63,13 @@ export class Race {
     }
     const ids=new Set();
     for(const p of msg.players){if(p.id===this.id)continue;ids.add(p.id);let remote=this.remote.get(p.id);if(!remote){const model=buildBike(p.bike,{rider:true});this.scene.add(model);model.position.set(p.x,p.y,p.z);model.rotation.y=p.yaw;remote={model,target:p};this.remote.set(p.id,remote);}remote.target=p;}
-    for(const[id,p]of this.remote)if(!ids.has(id)){this.scene.remove(p.model);this.remote.delete(id);}
+    for(const[id,p]of this.remote)if(!ids.has(id)){disposeBike(p.model);this.remote.delete(id);}
     $('player-list').replaceChildren();for(const p of msg.players){const div=document.createElement('div');div.className='player-name';const name=document.createElement('span');name.textContent=p.nickname+(p.id===this.id?' · ты':'');const time=document.createElement('span');time.textContent=formatTime(p.best);div.append(name,time);$('player-list').append(div);}
   }
   disconnected(){if(this.running&&this.online){this.exit();this.onNotice?.('Соединение прервано. Заезд остановлен; онлайн-рекорды уже сохранены сервером.');}}
   exit(notify=true){
     const wasRunning=this.running;this.damageUntil=0;$('damage-feedback').hidden=true;$('offroad-feedback').hidden=true;this.tyreMarks?.dispose();this.tyreMarks=null;document.body.classList.remove('racing');this.running=false;this.paused=false;$('race-pause').textContent='Пауза';this.stunt=null;this.stuntView?.dispose();this.stuntView=null;this.world.root.visible=true;this.arcadeView?.dispose();this.arcadeView=null;this.keys.clear();this.touchControls?.clear();this.connection?.ws.close();this.connection=null;
-    for(const p of this.remote.values())this.scene.remove(p.model);this.remote.clear();$('garage').hidden=false;$('hud').hidden=true;$('race-panel').hidden=true;$('countdown').hidden=true;this.setEngine(0);
+    for(const p of this.remote.values())disposeBike(p.model);this.remote.clear();$('garage').hidden=false;$('hud').hidden=true;$('race-panel').hidden=true;$('countdown').hidden=true;this.setEngine(0);
     if(notify&&wasRunning)this.onExit?.();
   }
   sendAction(type){if(this.connection?.ws.readyState===1)this.connection.ws.send(JSON.stringify({type}));}
@@ -99,7 +100,7 @@ export class Race {
   toggleSound(){this.sound=this.audioSystem.toggle();return this.sound;}
   setEngine(){this.audioSystem.update(this.state,this.inputs(),this.gameTime,this.running,this.weather);}
   async startStunt(bike){
-    this.exit(false);this.audioSystem.unlock();this.soloBike=bike;this.online=false;this.gameMode='stunt';this.stunt=createStunt(bike,this.practiceStunt);this.world.root.visible=false;this.stuntView=createStuntView(this.scene,this.stunt.level);this.scene.remove(this.player);this.scene.remove(this.cockpit);this.player=await this.createModel(bike);this.scene.add(this.player);this.cockpit.visible=false;this.running=true;this.state=createRider(bike);this.weatherView.update(this.renderTime,this.state,'clear');this.accumulator=0;document.body.classList.add('racing');$('garage').hidden=true;$('hud').hidden=false;$('countdown').hidden=true;$('feed-orc').hidden=true;document.querySelector('[data-control=rearBrake]').hidden=true;for(const selector of ['.lap-block','.health-block','.hud-left','.minimap-wrap'])document.querySelector(selector).hidden=true;$('riding-bike').textContent=BIKES.find(b=>b.id===bike).name;$('race-mode').textContent=`СТАНТ · ${stuntLevel(this.stunt.level).name}`;this.onNotice?.('W/↑ — газ, S/↓ — тормоз; A/← — наклон назад, D/→ — вперёд. R — повтор. Каждое падение +5 с.');
+    this.exit(false);this.audioSystem.unlock();this.soloBike=bike;this.online=false;this.gameMode='stunt';this.stunt=createStunt(bike,this.practiceStunt);this.world.root.visible=false;this.stuntView=createStuntView(this.scene,this.stunt.level);disposeBike(this.player);disposeBike(this.cockpit);this.player=await this.createModel(bike);this.cockpit=buildBike(bike);this.scene.add(this.player);this.cockpit.visible=false;this.running=true;this.state=createRider(bike);this.weatherView.update(this.renderTime,this.state,'clear');this.accumulator=0;document.body.classList.add('racing');$('garage').hidden=true;$('hud').hidden=false;$('countdown').hidden=true;$('feed-orc').hidden=true;document.querySelector('[data-control=rearBrake]').hidden=true;for(const selector of ['.lap-block','.health-block','.hud-left','.minimap-wrap'])document.querySelector(selector).hidden=true;$('riding-bike').textContent=BIKES.find(b=>b.id===bike).name;$('race-mode').textContent=`СТАНТ · ${stuntLevel(this.stunt.level).name}`;this.onNotice?.('W/↑ — газ, S/↓ — тормоз; A/← — наклон назад, D/→ — вперёд. R — повтор. Каждое падение +5 с.');
   }
   frameStunt(dt){
     const s=this.stunt;this.accumulator+=dt;while(this.accumulator>=STEP){this.accumulator-=STEP;const input=this.inputs();stepStunt(s,{...input,steer:-input.steer},STEP);}

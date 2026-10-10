@@ -15,7 +15,7 @@ export function stepStunt(s,input,dt=1/60){if(s.failed||s.finished)return;const 
  for(let n=0;n<4;n++){
   if(s.y<-7){s.failed=true;s.falls++;break;}
   s.time+=sub;s.omega+=(tilt*7-s.omega*.65)*sub;s.omega=limit(s.omega,-5,5);s.vy-=9.81*sub;
-  if(s.contacts.some(Boolean)){s.vx+=(throttle*9-brake*14*Math.sign(s.vx)-s.vx*.35)*sub;s.vx=limit(s.vx,-3,22);}else s.vx*=Math.exp(-sub*.02);
+  if(s.contacts.some(Boolean)){s.vx+=(throttle*9-s.vx*.35)*sub;s.vx=Math.sign(s.vx)*Math.max(0,Math.abs(s.vx)-brake*14*sub);s.vx=limit(s.vx,-3,22);}else s.vx*=Math.exp(-sub*.02);
   s.x=Math.max(.8,s.x+s.vx*sub);s.y+=s.vy*sub;s.angle+=s.omega*sub;s.contacts=[false,false];s.compression=[0,0];
   for(let iteration=0;iteration<3;iteration++)for(const [i,w]of stuntWheels(s).entries()){
    const g=stuntGround(w.x,s.level);if(!g)continue;const normal=Math.hypot(1,g.slope),nx=-g.slope/normal,ny=1/normal,penetration=(g.height+w.radius-w.y)/normal;if(penetration<-.012)continue;if(penetration>.8){s.failed=true;break;}s.contacts[i]=true;s.compression[i]=Math.max(s.compression[i],Math.min(.15,Math.max(0,penetration)));

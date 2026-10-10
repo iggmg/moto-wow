@@ -78,3 +78,5 @@ Three.js/WebGL 2, Vite, Node/Express, WebSocket, SQLite. Фиксированн�
 Источники решений и лицензии моделей: [docs/ASSETS.md](docs/ASSETS.md), [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 Безопасность и границы проверки: [docs/SECURITY.md](docs/SECURITY.md). Публикационный пакет создаётся отдельно от локальной истории Git и данных аккаунтов.
+
+Проверка механики и исправленные ошибки версии 0.4.6: [docs/MECHANICS_AUDIT.md](docs/MECHANICS_AUDIT.md).

@@ -1,3 +1,4 @@
+import {approachGate} from './helpers/cross-gate.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {BIKES,TRACKS,createRider,resetRider,stepRider,STEP,trackData,trackPoint,trackHeading,surfaceAt,groundHeight} from '../shared/game.js';
@@ -30,8 +31,8 @@ test('a sustained exit adds visible-accountable penalties, short verge touches d
 test('offroad checkpoint shortcuts are rejected but in-road ordered checkpoint completion keeps penalties in lap result',()=>{
  const s=placed(),data=trackData('meadow'),gate=data.GATES[1],yaw=trackHeading(gate.t,'meadow');
  Object.assign(s,{x:gate.x+Math.cos(yaw)*9.8,z:gate.z-Math.sin(yaw)*9.8,speed:0});stepRider(s,{},STEP,0,[]);assert.equal(s.nextGate,1);
- Object.assign(s,{x:gate.x,z:gate.z});stepRider(s,{},STEP,1,[]);assert.equal(s.nextGate,2);
- Object.assign(s,{x:data.GATES[0].x,z:data.GATES[0].z,nextGate:16,lapTime:40,penalty:5,offRoadPenalty:3,totalPenalty:5});stepRider(s,{},STEP,2,[]);assert(s.last>=45);assert.equal(s.penalty,0);assert.equal(s.offRoadPenalty,0);assert.equal(s.totalPenalty,5);
+ approachGate(s,1);stepRider(s,{},STEP,1,[]);assert.equal(s.nextGate,2);
+ approachGate(s,0);Object.assign(s,{nextGate:16,lapTime:40,penalty:5,offRoadPenalty:3,totalPenalty:5});stepRider(s,{},STEP,2,[]);assert(s.last>=45);assert.equal(s.penalty,0);assert.equal(s.offRoadPenalty,0);assert.equal(s.totalPenalty,5);
 });
 test('every rendered scenery boulder has shared solid bounds and moving impacts on all courses cost health; clear jumps avoid low obstacles',()=>{
  for(const track of TRACKS){const data=trackData(track.id);assert(data.SCENERY_ROCKS.length>80);for(const o of data.SCENERY_ROCKS)assert(data.OBSTACLES.includes(o));

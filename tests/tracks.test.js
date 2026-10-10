@@ -1,3 +1,4 @@
+import {approachGate} from './helpers/cross-gate.js';
 import test from 'node:test';
 import {driveHandlingLap} from './helpers/handling-pilot.js';
 import assert from 'node:assert/strict';
@@ -14,7 +15,7 @@ test('four distinct closed courses have ordered reachable gates, ramps and local
  const rider=createRider('cub',0,track.id);assert.equal(rider.trackId,track.id);assert.equal(rider.physicsVersion,VERSION);rider.nextGate=7;resetRider(rider);assert.equal(rider.x,data.GATES[6].x);assert.equal(rider.z,data.GATES[6].z);
  for(const ramp of data.RAMPS)assert.equal(surfaceAt(ramp.x,ramp.z,'clear',track.id).name,'ramp');for(const river of data.RIVERS)assert.equal(surfaceAt(river.x,river.z,'clear',track.id).name,'water');
  // All ordered checkpoints produce one lap under the same server physics rules.
- const s=createRider('himalayan',0,track.id);for(let i=1;i<=16;i++){const g=data.GATES[i%16];s.x=g.x;s.z=g.z;s.y=groundHeight(g.x,g.z,track.id);s.hitCooldown=100;stepRider(s,{},STEP,i,[],track.weather);}assert.equal(s.completed,1);assert.equal(s.last>0,true);
+ const s=createRider('himalayan',0,track.id);for(let i=1;i<=16;i++){const g=data.GATES[i%16];approachGate(s,i);s.hitCooldown=100;stepRider(s,{},STEP,i,[],track.weather);}assert.equal(s.completed,1);assert.equal(s.last>0,true);
  }
  assert.equal(trackData('meadow').RIVERS.length,0);assert.equal(trackData('canyon').RIVERS.length,3);assert(trackData('summit').width<trackData('rift').width);
 });

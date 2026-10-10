@@ -14,7 +14,7 @@ export function feedOrc(s,orcs,combat,time){const a=s.arcade;if(!a||s.finished||
 export function stepArcade(world,riders,orcs,combat,dt,time){
  for(const s of riders){const a=s.arcade;if(!a||s.finished)continue;
   a.fuel=Math.max(0,a.fuel-(s.speed>.05?dt*s.speed*.035:0));
-  if(oilPuddles(s.trackId).some(p=>Math.hypot(s.x-p.x,s.z-p.z)<p.radius))a.slipUntil=time+1.2;
+  if(!s.airborne&&oilPuddles(s.trackId).some(p=>Math.hypot(s.x-p.x,s.z-p.z)<p.radius))a.slipUntil=time+1.2;
   for(const p of world.items){if(p.readyAt>time||Math.abs(s.y-groundHeight(p.x,p.z,s.trackId))>1.5||Math.hypot(s.x-p.x,s.z-p.z)>1.65)continue;p.readyAt=time+18;a.score+=5;
    if(p.type==='fuel')a.fuel=Math.min(100,a.fuel+35);if(p.type==='oil')s.health=Math.min(100,s.health+18);if(p.type==='food')a.food=Math.min(4,a.food+1);if(p.type==='boost')a.boostUntil=time+4;a.message=PICKUP_NAMES[p.type]+' +';
   }
