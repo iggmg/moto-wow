@@ -12,7 +12,7 @@ test('simulation produces identical state for identical inputs',()=>{const a=cre
 
 test('right and left controls turn to the corresponding side of the rider',()=>{
  for(const yaw of [0,Math.PI/2,Math.PI,-Math.PI/2]){
-  for(const steer of [-1,1]){const s=createRider();s.x=0;s.z=0;s.yaw=yaw;s.speed=12;
+  for(const steer of [-1,1]){const s=createRider();s.x=0;s.z=0;s.yaw=yaw;s.travelYaw=yaw;s.speed=12;
    for(let i=0;i<30;i++)stepRider(s,{throttle:1,steer},STEP,0);
    const screenRightX=-Math.cos(yaw),screenRightZ=Math.sin(yaw);
    assert((s.x*screenRightX+s.z*screenRightZ)*steer>0,'steering must match the camera-relative direction');

@@ -15,7 +15,7 @@ export function stepCombat(combat,orcs,riders,dt=STEP,time=0){
   orc.windup=(orc.windup||0)+dt;
   if(orc.windup<.65)continue;
   const flight=d/cfg.speed,lead=Math.min(flight*.65,.7);
-  const aimX=target.x+Math.sin(target.yaw)*target.speed*lead,aimZ=target.z+Math.cos(target.yaw)*target.speed*lead;
+  const aimX=target.x+Math.sin(target.travelYaw??target.yaw)*target.speed*lead,aimZ=target.z+Math.cos(target.travelYaw??target.yaw)*target.speed*lead;
   const dx=aimX-orc.x,dz=aimZ-orc.z,length=Math.hypot(dx,dz),duration=length/cfg.speed;
   const y=groundHeight(orc.x,orc.z,orc.trackId)+1.55,aimY=target.y+.85;
   combat.projectiles.push({id:++combat.nextId,owner:orc.id,targetId:target.id,type:orc.weapon,trackId:orc.trackId,x:orc.x,z:orc.z,y,vx:dx/length*cfg.speed,vz:dz/length*cfg.speed,vy:(aimY-y+.5*cfg.gravity*duration*duration)/duration,gravity:cfg.gravity,radius:cfg.radius,life:4});

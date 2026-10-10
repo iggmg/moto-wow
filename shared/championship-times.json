@@ -1,5 +1,5 @@
 {
-  "physicsVersion": 9,
+  "physicsVersion": 10,
   "calibration": "Safe steering pilot, ordinary controls; isolated from enemy damage. Gold = ceil(reference × 1.12 + 4), silver × 1.35 + 10, bronze × 1.65 + 20.",
   "thresholds": {
     "rift": {
@@ -10,148 +10,148 @@
         "reference": 148.53
       },
       "exciter": {
-        "gold": 181,
+        "gold": 180,
         "silver": 223,
-        "bronze": 281,
-        "reference": 157.6
+        "bronze": 280,
+        "reference": 157.12
       },
       "himalayan": {
         "gold": 203,
         "silver": 249,
-        "bronze": 313,
-        "reference": 176.98
+        "bronze": 312,
+        "reference": 176.93
       },
       "winner": {
         "gold": 173,
         "silver": 214,
         "bronze": 269,
-        "reference": 150.67
+        "reference": 150.7
       },
       "pcx": {
-        "gold": 192,
-        "silver": 236,
-        "bronze": 296,
-        "reference": 167.12
+        "gold": 190,
+        "silver": 234,
+        "bronze": 294,
+        "reference": 165.7
       },
       "mt07": {
         "gold": 192,
         "silver": 236,
-        "bronze": 297,
-        "reference": 167.38
+        "bronze": 296,
+        "reference": 166.98
       }
     },
     "meadow": {
       "cub": {
-        "gold": 102,
+        "gold": 103,
         "silver": 129,
         "bronze": 165,
-        "reference": 87.43
+        "reference": 87.53
       },
       "exciter": {
-        "gold": 107,
+        "gold": 108,
         "silver": 135,
         "bronze": 172,
-        "reference": 91.88
+        "reference": 92.02
       },
       "himalayan": {
-        "gold": 119,
+        "gold": 120,
         "silver": 149,
         "bronze": 190,
-        "reference": 102.67
+        "reference": 102.78
       },
       "winner": {
         "gold": 104,
         "silver": 130,
         "bronze": 167,
-        "reference": 88.63
+        "reference": 88.73
       },
       "pcx": {
         "gold": 112,
         "silver": 140,
         "bronze": 178,
-        "reference": 95.57
+        "reference": 95.65
       },
       "mt07": {
         "gold": 113,
         "silver": 142,
         "bronze": 181,
-        "reference": 97.15
+        "reference": 97.25
       }
     },
     "canyon": {
       "cub": {
         "gold": 249,
-        "silver": 306,
+        "silver": 305,
         "bronze": 381,
-        "reference": 218.53
+        "reference": 218.5
       },
       "exciter": {
         "gold": 267,
-        "silver": 327,
+        "silver": 326,
         "bronze": 407,
-        "reference": 234.12
+        "reference": 234
       },
       "himalayan": {
-        "gold": 309,
+        "gold": 308,
         "silver": 377,
         "bronze": 468,
-        "reference": 271.45
+        "reference": 271.37
       },
       "winner": {
         "gold": 253,
         "silver": 310,
         "bronze": 386,
-        "reference": 221.55
+        "reference": 221.53
       },
       "pcx": {
-        "gold": 290,
+        "gold": 289,
         "silver": 354,
-        "bronze": 441,
-        "reference": 254.62
+        "bronze": 440,
+        "reference": 254.4
       },
       "mt07": {
         "gold": 287,
         "silver": 351,
-        "bronze": 437,
-        "reference": 252.3
+        "bronze": 436,
+        "reference": 252.1
       }
     },
     "summit": {
       "cub": {
         "gold": 325,
-        "silver": 397,
+        "silver": 396,
         "bronze": 492,
-        "reference": 285.97
+        "reference": 285.77
       },
       "exciter": {
-        "gold": 348,
+        "gold": 347,
         "silver": 424,
-        "bronze": 526,
-        "reference": 306.48
+        "bronze": 525,
+        "reference": 305.95
       },
       "himalayan": {
-        "gold": 397,
-        "silver": 484,
-        "bronze": 599,
-        "reference": 350.77
+        "gold": 396,
+        "silver": 483,
+        "bronze": 598,
+        "reference": 349.97
       },
       "winner": {
         "gold": 332,
         "silver": 405,
-        "bronze": 503,
-        "reference": 292.57
+        "bronze": 502,
+        "reference": 292.08
       },
       "pcx": {
-        "gold": 363,
+        "gold": 362,
         "silver": 442,
         "bronze": 548,
-        "reference": 319.95
+        "reference": 319.43
       },
       "mt07": {
-        "gold": 373,
-        "silver": 454,
-        "bronze": 563,
-        "reference": 328.72
+        "gold": 372,
+        "silver": 453,
+        "bronze": 562,
+        "reference": 327.88
       }
     }
   }

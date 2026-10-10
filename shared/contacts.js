@@ -11,7 +11,7 @@ export function stepContacts(riders,time,{damage=true}={}){
   if(!contact)continue;
   let {dx,dz,d}=contact;if(d<.001){dx=b.x-a.x;dz=b.z-a.z;d=Math.hypot(dx,dz);if(d<.001){dx=1;dz=0;d=1;}}const nx=dx/d,nz=dz/d,overlap=.82-contact.d;
   a.x-=nx*overlap*.5;a.z-=nz*overlap*.5;b.x+=nx*overlap*.5;b.z+=nz*overlap*.5;
-  const avx=Math.sin(a.yaw)*a.speed+(a.contactVX||0),avz=Math.cos(a.yaw)*a.speed+(a.contactVZ||0),bvx=Math.sin(b.yaw)*b.speed+(b.contactVX||0),bvz=Math.cos(b.yaw)*b.speed+(b.contactVZ||0);
+  const avx=Math.sin(a.travelYaw??a.yaw)*a.speed+(a.contactVX||0),avz=Math.cos(a.travelYaw??a.yaw)*a.speed+(a.contactVZ||0),bvx=Math.sin(b.travelYaw??b.yaw)*b.speed+(b.contactVX||0),bvz=Math.cos(b.travelYaw??b.yaw)*b.speed+(b.contactVZ||0);
   const closing=Math.max(0,(avx-bvx)*nx+(avz-bvz)*nz),impulse=Math.min(8,closing*.6);
   a.contactVX=(a.contactVX||0)-nx*impulse;a.contactVZ=(a.contactVZ||0)-nz*impulse;b.contactVX=(b.contactVX||0)+nx*impulse;b.contactVZ=(b.contactVZ||0)+nz*impulse;
   for(const r of [a,b]){const v=Math.hypot(r.contactVX,r.contactVZ);if(v>10){r.contactVX*=10/v;r.contactVZ*=10/v;}}
