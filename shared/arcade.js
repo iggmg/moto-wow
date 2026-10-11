@@ -13,12 +13,12 @@ export function feedOrc(s,orcs,combat,time){const a=s.arcade;if(!a||s.finished||
 }
 export function stepArcade(world,riders,orcs,combat,dt,time){
  for(const s of riders){const a=s.arcade;if(!a||s.finished)continue;
-  a.fuel=Math.max(0,a.fuel-(s.speed>.05?dt*s.speed*.035:0));
+  a.fuel=Math.max(0,a.fuel-(Math.abs(s.speed)>.05?dt*Math.abs(s.speed)*.035:0));
   if(!s.airborne&&oilPuddles(s.trackId).some(p=>Math.hypot(s.x-p.x,s.z-p.z)<p.radius))a.slipUntil=time+1.2;
   for(const p of world.items){if(p.readyAt>time||Math.abs(s.y-groundHeight(p.x,p.z,s.trackId))>1.5||Math.hypot(s.x-p.x,s.z-p.z)>1.65)continue;p.readyAt=time+18;a.score+=5;
    if(p.type==='fuel')a.fuel=Math.min(100,a.fuel+35);if(p.type==='oil')s.health=Math.min(100,s.health+18);if(p.type==='food')a.food=Math.min(4,a.food+1);if(p.type==='boost')a.boostUntil=time+4;a.message=PICKUP_NAMES[p.type]+' +';
   }
-  if(time>=a.helpReady&&s.speed<2&&nearestTrack(s.x,s.z,s.trackId).distance>trackData(s.trackId).width/2+3&&orcs.some(o=>friendlyTo(o,s.id,time)&&o.friends[s.id].helper&&Math.hypot(o.x-s.x,o.z-s.z)<16)){
+  if(time>=a.helpReady&&Math.abs(s.speed)<2&&nearestTrack(s.x,s.z,s.trackId).distance>trackData(s.trackId).width/2+3&&orcs.some(o=>friendlyTo(o,s.id,time)&&o.friends[s.id].helper&&Math.hypot(o.x-s.x,o.z-s.z)<16)){
    const t=Math.max(0,s.nextGate-1)/CHECKPOINTS,p=trackPoint(t,s.trackId);s.x=p.x;s.z=p.z;s.y=groundHeight(p.x,p.z,s.trackId);s.yaw=trackHeading(t,s.trackId);s.vy=0;s.speed=0;s.airborne=false;s.contactVX=s.contactVZ=0;s.contactShield=2;s.penalty+=3;s.totalPenalty+=3;a.helpReady=time+20;a.message='Орк вернул тебя к пройденной точке. Штраф +3 с.';
   }
  }

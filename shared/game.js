@@ -1,6 +1,6 @@
 import { friendlyTo,strikeOrc } from './arcade.js';
 import { damageRider } from './health.js';
-export const VERSION = 13;
+export const VERSION = 14;
 export const STEP = 1 / 60;
 import {DEFAULT_TRACK,PHYSICS_VERSION,CHECKPOINTS,trackData,trackById,trackPoint,trackHeading,nearestTrack,groundHeight,baseHeight,rampAt,featureCoords,surfaceAt,ORCS} from './tracks.js';
 export * from './tracks.js';
@@ -45,7 +45,7 @@ export function stepOrcs(orcs,riders,dt=STEP,time=0) {
       let nearest=Infinity;
       for(const rider of riders) {
         if(rider.health===0||rider.finished||friendlyTo(orc,rider.id,time))continue;
-        const d=distance(rider),alert=rider.arcade?.huntUntil>time?100:rider.speed<1?90:36;
+        const d=distance(rider),alert=rider.arcade?.huntUntil>time?100:Math.abs(rider.speed)<1?90:36;
         if(d<alert&&d<nearest&&Math.hypot(rider.x-home.x,rider.z-home.z)<110){target=rider;nearest=d;}
       }
     }
@@ -76,7 +76,7 @@ export function resetRider(s) {
 }
 export function normalizeInput(input={}) {
   if(!input||typeof input!=='object')input={};
-  return {throttle:clamp(Number(input.throttle)||0,0,1),brake:clamp(Number(input.brake)||0,0,1),rearBrake:clamp(Number(input.rearBrake)||0,0,1),steer:clamp(Number(input.steer)||0,-1,1)};
+  return {throttle:clamp(Number(input.throttle)||0,0,1),brake:clamp(Number(input.brake)||0,0,1),rearBrake:clamp(Number(input.rearBrake)||0,0,1),reverse:clamp(Number(input.reverse)||0,0,1),steer:clamp(Number(input.steer)||0,-1,1)};
 }
 export function stepRider(s,rawInput,dt=STEP,time=0,orcs=null,weather='clear') {
   if(s.health===0||s.finished){s.speed=0;return null;}
@@ -90,21 +90,27 @@ export function stepRider(s,rawInput,dt=STEP,time=0,orcs=null,weather='clear') {
   // Snow remains slippery for steering; low gear still supplies enough drive to restart uphill.
   const roadDrive=surface.name==='snow'?.80*(slip?.32:1):grip,driveGrip=surface.offRoad?Math.max(.60,roadDrive*.8)*(slip?.32:1):roadDrive;
   const previous={x:s.x,z:s.z};
-  if(s.speed<.5||!Number.isFinite(s.travelYaw))s.travelYaw=s.yaw;
+  if(Math.abs(s.speed)<.5||!Number.isFinite(s.travelYaw))s.travelYaw=s.yaw;
   const resistance=.3+s.speed*s.speed*.004+drag+(surface.offRoad&&surface.name==='snow'?.8:0);
   s.rearBrake=((s.rearBrake||0)+(input.rearBrake-(s.rearBrake||0))*(1-Math.exp(-dt*12)));
   const braking=Math.min(20,input.brake*14+s.rearBrake*8),drive=input.throttle*(1-.75*Math.max(input.brake,s.rearBrake));
   // Neither brake acts on airborne wheels; grip and tyre effects resume on landing.
-  if(s.airborne)s.speed=Math.max(0,s.speed*Math.exp(-dt*.02));
+  if(s.airborne)s.speed*=Math.exp(-dt*.02);
+  else if(input.reverse>0||s.speed<0){
+    // Reverse is a low gear. Changing direction first brakes to a complete stop.
+    if(s.speed>0)s.speed=Math.max(0,s.speed-(14*input.reverse+braking+resistance)*dt);
+    else if(input.throttle>0||braking>0)s.speed=Math.min(0,s.speed+(14*input.throttle+braking+resistance)*dt);
+    else {const reverseDrive=input.reverse*bike.acceleration*Math.max(.8,driveGrip);s.speed=-clamp(-s.speed+(reverseDrive-resistance-(input.reverse===0?2:0))*dt,0,3);}
+  }
   else {const acceleration=drive*bike.acceleration*driveGrip*(boost?1.8:1),overspeed=Math.max(0,s.speed-max)*2;s.speed=Math.max(0,s.speed+(Math.min(acceleration,Math.max(0,max-s.speed)/dt)-braking-resistance-overspeed)*dt);}
   s.steer+=(input.steer-s.steer)*(1-Math.exp(-dt*11));
-  const authority=bike.handling*((.35+s.speed*.042)/(1+s.speed*.018)+.75/(1+(s.speed/12)**2))*Math.sqrt(.65+.35*grip)*(surface.offRoad?.72:1);
-  const rate=Math.min(authority,(11+s.speed*.25)/Math.max(1,s.speed));
-  s.yawRate=-s.steer*rate*clamp(s.speed/2,0,1)*(s.airborne?.15:1)*(1+.22*s.rearBrake);
+  const magnitude=Math.abs(s.speed),authority=bike.handling*((.35+magnitude*.042)/(1+magnitude*.018)+.75/(1+(magnitude/12)**2))*Math.sqrt(.65+.35*grip)*(surface.offRoad?.72:1);
+  const rate=Math.min(authority,(11+magnitude*.25)/Math.max(1,magnitude));
+  s.yawRate=-s.steer*rate*clamp(magnitude/2,0,1)*Math.sign(s.speed)*(s.airborne?.15:1)*(1+.22*s.rearBrake);
   s.yaw+=s.yawRate*dt;
   // Rear braking breaks lateral grip progressively, not by adding a scripted spin.
   // Releasing it recovers traction while preserving the current travel direction.
-  if(!s.airborne){const traction=(12*grip*grip+Math.max(0,10-s.speed)*2*(surface.offRoad?grip:1))*(1-.8*s.rearBrake)*(1+input.brake*.25);s.travelYaw+=angleDiff(s.yaw,s.travelYaw)*(1-Math.exp(-traction*dt));}
+  if(!s.airborne){const traction=(12*grip*grip+Math.max(0,10-magnitude)*2*(surface.offRoad?grip:1))*(1-.8*s.rearBrake)*(1+input.brake*.25);s.travelYaw+=angleDiff(s.yaw,s.travelYaw)*(1-Math.exp(-traction*dt));}
   const lean=s.airborne?0:-Math.atan2(s.speed*s.yawRate,9.81)*.65,pitch=s.airborne?0:input.brake*.11+s.rearBrake*.05-drive*.035;
   s.lean=(s.lean||0)+(lean-(s.lean||0))*(1-Math.exp(-dt*7));s.pitch=(s.pitch||0)+(pitch-(s.pitch||0))*(1-Math.exp(-dt*7));
   s.slipAngle=angleDiff(s.travelYaw,s.yaw);
@@ -113,7 +119,7 @@ export function stepRider(s,rawInput,dt=STEP,time=0,orcs=null,weather='clear') {
   s.x=clamp(s.x,-220,220);s.z=clamp(s.z,-180,180);
   const gy=groundHeight(s.x,s.z,s.trackId),ramp=rampAt(s.x,s.z,s.trackId);
   const hill=baseHeight(s.x+Math.sin(s.travelYaw),s.z+Math.cos(s.travelYaw),s.trackId)-baseHeight(s.x,s.z,s.trackId);
-  if(s.speed>0&&!s.airborne)s.speed=Math.max(0,s.speed-hill*2*dt);
+  if(s.speed!==0&&!s.airborne)s.speed=Math.sign(s.speed)*Math.max(0,Math.abs(s.speed)-Math.sign(s.speed)*hill*2*dt);
   if(!s.airborne&&ramp){s.lastRamp=ramp.id;s.y=gy;s.vy=0;}
   else if(!s.airborne&&s.lastRamp!==null){
     const last=RAMPS[s.lastRamp],q=featureCoords(last,s.x,s.z),forward=Math.cos(s.yaw-last.heading);
@@ -139,8 +145,8 @@ export function stepRider(s,rawInput,dt=STEP,time=0,orcs=null,weather='clear') {
       // Remove motion into the solid object; a glancing contact keeps its tangent.
       vx+=nx*impact;vz+=nz*impact;const tangent=Math.hypot(vx,vz);
       s.x=obstacle.x+nx*(radius+.002);s.z=obstacle.z+nz*(radius+.002);
-      s.speed=s.health>0?tangent*.92:0;s.airborne=false;s.vy=0;s.contactVX=0;s.contactVZ=0;
-      if(s.speed>.01)s.travelYaw=Math.atan2(vx,vz);s.slipAngle=angleDiff(s.travelYaw,s.yaw);s.y=groundHeight(s.x,s.z,s.trackId);
+      const direction=s.speed<0?-1:1;s.speed=s.health>0?direction*tangent*.92:0;s.airborne=false;s.vy=0;s.contactVX=0;s.contactVZ=0;
+      if(Math.abs(s.speed)>.01)s.travelYaw=Math.atan2(vx*direction,vz*direction);s.slipAngle=angleDiff(s.travelYaw,s.yaw);s.y=groundHeight(s.x,s.z,s.trackId);
     }
   }
   const endSurface=surfaceAt(s.x,s.z,weather,s.trackId);s.offRoad=endSurface.offRoad;s.surface=endSurface.name;

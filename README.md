@@ -80,3 +80,5 @@ Three.js/WebGL 2, Vite, Node/Express, WebSocket, SQLite. Фиксированн�
 Безопасность и границы проверки: [docs/SECURITY.md](docs/SECURITY.md). Публикационный пакет создаётся отдельно от локальной истории Git и данных аккаунтов.
 
 Проверка механики и исправленные ошибки версии 0.4.6: [docs/MECHANICS_AUDIT.md](docs/MECHANICS_AUDIT.md).
+
+Управление задним ходом и компактное меню телефона: [docs/MOBILE_CONTROLS.md](docs/MOBILE_CONTROLS.md).

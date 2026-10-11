@@ -15,7 +15,7 @@ export function stepContacts(riders,time,{damage=true}={}){
   const closing=Math.max(0,(avx-bvx)*nx+(avz-bvz)*nz),impulse=Math.min(8,closing*.6);
   a.contactVX=(a.contactVX||0)-nx*impulse;a.contactVZ=(a.contactVZ||0)-nz*impulse;b.contactVX=(b.contactVX||0)+nx*impulse;b.contactVZ=(b.contactVZ||0)+nz*impulse;
   for(const r of [a,b]){const v=Math.hypot(r.contactVX,r.contactVZ);if(v>10){r.contactVX*=10/v;r.contactVZ*=10/v;}}
-  a.speed=Math.max(0,a.speed-impulse*.25);b.speed=Math.max(0,b.speed-impulse*.25);
+  for(const r of [a,b])r.speed=Math.sign(r.speed)*Math.max(0,Math.abs(r.speed)-impulse*.25);
   if(damage&&closing>4){const severity=Math.min(24,Math.round(closing*.8));damageRider(a,'rider',severity);damageRider(b,'rider',severity);}
  }
 }

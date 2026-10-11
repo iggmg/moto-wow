@@ -34,7 +34,7 @@ export class RaceAudio {
   silence(){if(!this.context)return;for(const g of [this.motorGain,this.mechanicsGain,this.roadGain,this.windGain,this.skidGain])g.gain.setTargetAtTime(0,this.context.currentTime,.08);}
   update(state,input,time,running,weather='clear'){
     this.active=running&&!state.finished;if(!this.context)return;const visible=!document.hidden;this.music.set({enabled:this.settings.music,track:this.settings.track,volume:this.settings.musicVolume,active:this.active&&visible});if(!visible||!running||!this.enabled){this.silence();return;}
-    const c=this.context,t=c.currentTime,speed=state.speed,load=input.throttle||0;
+    const c=this.context,t=c.currentTime,speed=Math.abs(state.speed),load=Math.max(input.throttle||0,input.reverse||0);
     const scooter=state.bike==='pcx',adventure=state.bike==='himalayan';
     const gear=Math.min(5,1+Math.floor(speed/(scooter?40:6.3)));
     const rpm=scooter?1500+speed*140+load*1300:1250+(speed%(6.3))*620+load*900+gear*200;
