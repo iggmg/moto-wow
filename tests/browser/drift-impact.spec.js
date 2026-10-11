@@ -4,7 +4,9 @@ test('snow drifts with keyboard steering, HUD warns, and countersteering recover
  await page.locator('[data-track="meadow"]').click();await page.locator('#practice-weather').selectOption('snow');await page.locator('#practice-start').click();await page.waitForTimeout(3300);
  await page.evaluate(async()=>{const {trackPoint,trackHeading,groundHeight}=await import('/shared/game.js');const r=window.__motoRace,p=trackPoint(.06,r.trackId),yaw=trackHeading(.06,r.trackId);Object.assign(r.state,p,{yaw,travelYaw:yaw,speed:18,steer:0,health:100,hitCooldown:100,y:groundHeight(p.x,p.z,r.trackId)});r.orcs=[];r.combat.projectiles=[];r.applyCamera(true);});
  await page.keyboard.down('ArrowRight');await expect.poll(()=>page.evaluate(()=>Math.abs(window.__motoRace.state.slipAngle))).toBeGreaterThan(.12);await page.keyboard.up('ArrowRight');await expect(page.locator('#surface')).toContainText('ЗАНОС');await page.screenshot({path:'artifacts/drift-snow.png'});
- await page.keyboard.down('ArrowLeft');await page.keyboard.down('ArrowDown');await expect.poll(()=>page.evaluate(()=>Math.abs(window.__motoRace.state.slipAngle)),{timeout:4000}).toBeLessThan(.06);await page.keyboard.up('ArrowLeft');await page.keyboard.up('ArrowDown');expect(errors).toEqual([]);
+ await page.keyboard.down('ArrowLeft');await page.keyboard.down('ArrowDown');
+ // Release near the stop: keeping the unified back pedal held would start reversing.
+ await expect.poll(()=>page.evaluate(()=>window.__motoRace.state.speed),{timeout:4000,intervals:[50]}).toBeLessThan(.5);await page.keyboard.up('ArrowLeft');await page.keyboard.up('ArrowDown');await expect.poll(()=>page.evaluate(()=>Math.abs(window.__motoRace.state.slipAngle)),{timeout:4000}).toBeLessThan(.06);expect(errors).toEqual([]);
 });
 test('obstacle impact reduces visible health once and displays the obstacle name',async({page})=>{
  await page.goto('/');await page.locator('#practice-start').click();await page.waitForTimeout(3300);
