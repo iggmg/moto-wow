@@ -49,15 +49,15 @@
   },
   "winner": {
     "file": "winner.glb",
-    "revision": 3,
+    "revision": 5,
     "author": "Moto Rift project",
     "license": "MIT",
     "kind": "original-reference-model",
     "units": "meters",
     "forward": "+Z",
-    "triangles": 84896,
-    "drawCalls": 43,
-    "bytes": 2747148
+    "triangles": 117954,
+    "drawCalls": 48,
+    "bytes": 3843460
   },
   "pcx": {
     "file": "pcx.glb",

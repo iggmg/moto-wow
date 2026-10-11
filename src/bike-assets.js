@@ -5,11 +5,11 @@ import {disposeBike} from './model-geometry.js';
 import {BIKE_VISUALS,tyreRadius} from './bike-specs.js';
 let manifestRequest;
 async function manifest(){
- if(!manifestRequest)manifestRequest=fetch(`${import.meta.env.BASE_URL}models/manifest.json?v=3`).then(r=>{if(!r.ok)throw new Error('Bike manifest unavailable');return r.json();}).catch(e=>{manifestRequest=null;throw e;});
+ if(!manifestRequest)manifestRequest=fetch(`${import.meta.env.BASE_URL}models/manifest.json?v=5`).then(r=>{if(!r.ok)throw new Error('Bike manifest unavailable');return r.json();}).catch(e=>{manifestRequest=null;throw e;});
  return manifestRequest;
 }
 export function configureBikeAsset(root,id,{rider=true}={}){
- root.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;}});
+ root.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;if(id==='winner')for(const m of Array.isArray(o.material)?o.material:[o.material])if(m.name.startsWith('Winner'))m.envMapIntensity=m.name.includes('paint')?.15:.50;}});
  const body=root.getObjectByName('BikeBody'),wheels=['WheelRear','WheelFront'].map(n=>root.getObjectByName(n));
  if(!body||wheels.some(w=>!w))throw new Error('Bike animation hierarchy is incomplete');
  const person=root.getObjectByName('Rider');if(person)person.visible=rider;

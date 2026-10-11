@@ -3,9 +3,10 @@ import {TextGeometry} from 'three/addons/geometries/TextGeometry.js';
 import {Font} from 'three/addons/loaders/FontLoader.js';
 import fontData from 'three/examples/fonts/helvetiker_regular.typeface.json' with {type:'json'};
 import {bikeById} from '../shared/game.js';
-import {BIKE_VISUALS,tyreRadius} from './bike-specs.js';
+import {BIKE_VISUALS,BIKE_RIGS,tyreRadius} from './bike-specs.js';
 import {add,box,ellipsoid,tube,riderModel,optimize} from './model-geometry.js';
 import {finish,bevel,loft,skin,pipe,arcFender} from './bike-surfaces.js';
+import {winnerBody,winnerControls,winnerPaint,winnerFootrest,winnerMechanical} from './winner-body.js';
 const font=new Font(fontData),TAU=Math.PI*2;
 const rubber=finish('tyre rubber',0x171a1c,0,.91,'rubber'),seat=finish('seat grain',0x14171a,0,.83,'seat'),black=finish('satin frame',0x161b20,.28,.43),plastic=finish('unpainted polymer',0x22272b,.02,.72),chrome=finish('polished aluminium',0xb9c1c8,.94,.21),steel=finish('cast aluminium',0x41484e,.55,.54),discSteel=finish('brushed brake steel',0x919b9e,.92,.37),bronze=finish('heat stained exhaust',0x777466,.80,.38),carbon=finish('carbon weave',0x10151a,.30,.33,'carbon');
 const ivory=finish('ivory paint',0xe0d6bd,.06,.39),glass=finish('dark screen',0x15242c,.22,.18);
@@ -22,17 +23,17 @@ function disc(g,x,diameter){
  const geo=new T.ExtrudeGeometry(s,{depth:.003,bevelEnabled:false,curveSegments:6});geo.rotateY(Math.PI/2);add(g,geo,discSteel,x);
  for(let i=0;i<6;i++){const a=i/6*TAU;tube(g,[x,Math.sin(a)*r*.23,Math.cos(a)*r*.23],[x,Math.sin(a+.16)*r*.55,Math.cos(a+.16)*r*.55],.007,black,6);cylinder(g,x+.004,Math.sin(a)*r*.55,Math.cos(a)*r*.55,.005,.003,bronze,8);}
 }
-function wheel(tyre,color,{wire=false,knobby=false,rotor=0,dual=false}={}){
+function wheel(tyre,color,{wire=false,knobby=false,rotor=0,dual=false,spokes=5,spokeWidth=1,paintCalm=false}={}){
  const [diameter,width,height]=tyre,rim=diameter/2,r=tyreRadius(tyre),g=new T.Group();g.userData.dynamic=true;
  // Tyre section has separate bead, sidewall, shoulders and a rounded crown.
  const points=[[-.38*width,rim-.008],[-.5*width,rim+.012],[-.53*width,rim+height*.42],[-.44*width,rim+height*.76],[-.26*width,r-.004],[0,r],[.26*width,r-.004],[.44*width,rim+height*.76],[.53*width,rim+height*.42],[.5*width,rim+.012],[.38*width,rim-.008]].map(([x,y])=>new T.Vector2(y,x));
  const tyreGeo=new T.LatheGeometry(points,80);tyreGeo.rotateZ(-Math.PI/2);add(g,tyreGeo,rubber);
- const rimMat=finish('wheel paint '+color,color,.68,.27);
+ const rimMat=paintCalm?finish('Winner wheel paint '+color,color,.35,.40):finish('wheel paint '+color,color,.68,.27);
  for(const side of [-1,1]){
   ring(g,side*width*.34,0,0,rim-.008,.010,rimMat);ring(g,side*width*.31,0,0,rim-.022,.008,rimMat);
   ring(g,side*width*.49,0,0,rim+height*.40,.0012,plastic);
   if(wire)for(let i=0;i<32;i++){const a=i/32*TAU,b=a+(i%2?.20:-.20);tube(g,[side*.025,Math.sin(a)*.039,Math.cos(a)*.039],[side*width*.28,Math.sin(b)*(rim-.022),Math.cos(b)*(rim-.022)],.0016,chrome,5);cylinder(g,side*width*.28,Math.sin(b)*(rim-.024),Math.cos(b)*(rim-.024),.003,.010,steel,6);}
-  else for(let i=0;i<5;i++){const a=i/5*TAU,p=new T.Group();p.rotation.x=a;g.add(p);bevel(p,[[-.018,.035],[-.042,rim*.55],[-.047,rim-.018],[-.017,rim-.018],[.009,rim*.5],[.018,.035]],.013,rimMat,side*width*.22,.0018);}
+  else for(let i=0;i<spokes;i++){const a=i/spokes*TAU,p=new T.Group();p.rotation.x=a;g.add(p);bevel(p,[[-.018,.035],[-.042,rim*.55],[-.047,rim-.018],[-.017,rim-.018],[.009,rim*.5],[.018,.035]].map(([x,y])=>[x*spokeWidth,y]),.013,rimMat,side*width*.22,.0018);}
  }
  cylinder(g,0,0,0,.036,width*.7,steel);
  // Curved tread sipes follow the tyre crown; adventure tyres use separate blocks.
@@ -132,11 +133,11 @@ function chassis(g,s,front,rear,fr,rr,headZ){
   if(s.frontDisc){const x=side*(s.front[1]*.48+.026);if(side>0||s.id==='mt07'){bevel(g,[[front-.16,fr+.015],[front-.085,fr+.01],[front-.07,fr+.12],[front-.11,fr+.16],[front-.18,fr+.13]],.035,black,x,.003);pipe(g,[[x,fr+.15,front-.14],[side*.07,fr+.33,front-.05],[side*.05,s.barY-.16,headZ]],.003,rubber,24,5);}}
   if(s.id==='cub'||s.id==='pcx')shock(g,[side*.10,rr+.02,rear+.015],[side*.11,s.seatY-.06,rear+.16],.020,s.id==='pcx'?finish('purple spring',0x6b324e,.5,.35):chrome);
   tube(g,[side*.13,.365,-.13],[side*.22,.365,-.13],.014,steel,8);tube(g,[side*.16,.365,-.13],[side*.25,.365,-.13],.022,rubber,12);
-  bevel(g,[[-.51,.57],[-.27,.36],[-.18,.38],[-.33,.62]],.016,steel,side*.135,.003);fastener(g,side*.15,.40,-.28);
+  if(s.id==='winner')winnerFootrest(g,side);else bevel(g,[[-.51,.57],[-.27,.36],[-.18,.38],[-.33,.62]],.016,steel,side*.135,.003);fastener(g,side*.15,.40,-.28);
  }
  if(!['pcx','cub'].includes(s.id)){shock(g,[0,.44,-.21],[0,s.seatY-.09,-.50],s.id==='mt07'?.027:.021);chainDrive(g,s,rr,rear);}
  tube(g,[-.10,s.barY-.12,headZ],[.10,s.barY-.12,headZ],.014,steel,10);
- arcFender(g,front,fr,fr,s.front[1],s.paint,s.id==='himalayan'?-.92:-1.05,s.id==='himalayan'?.97:1.12);
+ if(s.id!=='winner')arcFender(g,front,fr,fr,s.front[1],s.paint,s.id==='himalayan'?-.92:-1.05,s.id==='himalayan'?.97:1.12);
  if(s.id==='cub')arcFender(g,rear,rr,rr,.09,s.paint,-1.25,1.2);
 }
 function cubBody(g,s,headZ){
@@ -253,18 +254,19 @@ function bigBody(g,s,headZ){
 }
 export function buildBike(id,{rider=false,optimizeMeshes=true}={}){
  const base=bikeById(id),s={...base,...BIKE_VISUALS[base.id]},root=new T.Group(),g=new T.Group();root.name=s.name;g.name='BikeBody';root.add(g);s.paint=finish(s.id+' body paint',s.color,s.id==='himalayan'?.12:.16,s.id==='himalayan'?.48:.30);
- const front=s.wheelbase/2,rear=-front,fr=tyreRadius(s.front),rr=tyreRadius(s.rear),headZ=front-.18;
+ if(id==='winner')s.paint=winnerPaint(s.color);
+ const front=s.wheelbase/2,rear=-front,fr=tyreRadius(s.front),rr=tyreRadius(s.rear),headZ=front-(id==='winner'?.285:.18);
  const rearColor=id==='winner'?0xef641d:id==='mt07'?0x36aaa3:s.wire?0xbdc3c7:id==='exciter'?0x492574:0x1c232b,frontColor=id==='winner'?0x087edb:rearColor;
- const backWheel=wheel(s.rear,rearColor,{wire:s.wire,knobby:id==='himalayan',rotor:s.rearDisc});backWheel.name='WheelRear';backWheel.position.set(0,rr,rear);g.add(backWheel);
- const frontWheel=wheel(s.front,frontColor,{wire:s.wire,knobby:id==='himalayan',rotor:s.frontDisc,dual:id==='mt07'});frontWheel.name='WheelFront';frontWheel.position.set(0,fr,front);g.add(frontWheel);
- chassis(g,s,front,rear,fr,rr,headZ);engine(g,s);exhaust(g,s);
- if(id==='cub')cubBody(g,s,headZ);else if(id==='pcx')pcxBody(g,s);else if(['mt07','himalayan'].includes(id))bigBody(g,s,headZ);else sportsBody(g,s,headZ);
- controls(g,s,headZ);
- const tailZ=id==='himalayan'?-.91:-.94;face(g,[[-.060,s.seatY-.080],[.060,s.seatY-.080],[.055,s.seatY-.046],[-.055,s.seatY-.046]],tailZ,red);
- bevel(g,[[tailZ,s.seatY-.12],[tailZ-.03,s.seatY-.18],[tailZ-.045,.46],[tailZ-.025,.46]],.065,plastic,0,.001);
+ const backWheel=wheel(s.rear,rearColor,{wire:s.wire,knobby:id==='himalayan',rotor:s.rearDisc,spokes:id==='winner'?6:5,spokeWidth:id==='winner'?.5:1,paintCalm:id==='winner'});backWheel.name='WheelRear';backWheel.position.set(0,rr,rear);g.add(backWheel);
+ const frontWheel=wheel(s.front,frontColor,{wire:s.wire,knobby:id==='himalayan',rotor:s.frontDisc,dual:id==='mt07',spokes:id==='winner'?8:5,spokeWidth:id==='winner'?.38:1,paintCalm:id==='winner'});frontWheel.name='WheelFront';frontWheel.position.set(0,fr,front);g.add(frontWheel);
+ chassis(g,s,front,rear,fr,rr,headZ);if(id==='winner')winnerMechanical(g,s,front,fr,label);else{engine(g,s);exhaust(g,s);}
+ if(id==='cub')cubBody(g,s,headZ);else if(id==='winner')winnerBody(g,s,headZ,label);else if(id==='pcx')pcxBody(g,s);else if(['mt07','himalayan'].includes(id))bigBody(g,s,headZ);else sportsBody(g,s,headZ);
+ if(id==='winner')winnerControls(g,s,headZ);else controls(g,s,headZ);
+ const tailZ=id==='himalayan'?-.91:-.94,tailY=id==='winner'?.932:s.seatY;face(g,[[-.060,tailY-.080],[.060,tailY-.080],[.055,tailY-.046],[-.055,tailY-.046]],tailZ,red);
+ bevel(g,[[tailZ,tailY-.12],[tailZ-.03,tailY-.18],[tailZ-.045,.46],[tailZ-.025,.46]],.065,plastic,0,.001);
  const plate=face(g,[[-.058,.477],[.058,.477],[.058,.555],[-.058,.555]],tailZ-.040,finish('blank number plate',0xbcc6c5,.06,.52));plate.rotation.y=Math.PI;plate.position.z=tailZ-.04;
- for(const side of [-1,1]){tube(g,[side*.04,s.seatY-.135,tailZ],[side*.12,s.seatY-.135,tailZ],.006,black,8);ellipsoid(g,side*.13,s.seatY-.135,tailZ,.024,.012,.021,amber);}
- if(rider)g.add(riderModel(s));root.userData={wheels:[backWheel,frontWheel],body:g,bike:id,wheelRadii:[rr,fr],visualGeneration:s.generation};
+ for(const side of [-1,1]){tube(g,[side*.04,tailY-.135,tailZ],[side*.12,tailY-.135,tailZ],.006,black,8);ellipsoid(g,side*.13,tailY-.135,tailZ,.024,.012,.021,amber);}
+ if(rider)g.add(riderModel(id==='winner'?{...s,...BIKE_RIGS.winner}:s));root.userData={wheels:[backWheel,frontWheel],body:g,bike:id,wheelRadii:[rr,fr],visualGeneration:s.generation};
  if(optimizeMeshes){optimize(backWheel);optimize(frontWheel);optimize(g);}return root;
 }
 

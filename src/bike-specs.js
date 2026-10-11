@@ -13,6 +13,6 @@ export const tyreRadius = tyre => tyre[0]/2+tyre[2];
 // Pose anchors measured in the adapted meshes, separate from factory dimensions.
 export const BIKE_RIGS={
  cub:{grip:[.30,1.06,.407]},exciter:{seatY:.84,grip:[.300,1.025,.282]},
- himalayan:{grip:[.34,1.175,.45]},winner:{grip:[.30,1.083,.439]},
+ himalayan:{grip:[.34,1.175,.45]},winner:{grip:[.30,1.083,.304]},
  pcx:{seatY:.790,grip:[.286,1.036,.137]},mt07:{grip:[.353,1.088,.297]}
 };

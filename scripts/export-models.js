@@ -8,8 +8,9 @@ const server=await createServer({configFile:false,base:'/',server:{host:'127.0.0
 let browser;
 try{
  await server.listen();browser=await chromium.launch({executablePath:process.env.CHROME_PATH||'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',args:['--enable-webgl','--use-angle=metal']});
- const page=await browser.newPage();await page.goto('http://127.0.0.1:5190/');mkdirSync('public/models',{recursive:true});const manifest={},sources=JSON.parse(readFileSync('assets/bike-bases/sources.json'));
- for(const bike of BIKES){
+ const page=await browser.newPage();await page.goto('http://127.0.0.1:5190/');mkdirSync('public/models',{recursive:true});const selected=process.argv.slice(2),manifest=selected.length?JSON.parse(readFileSync('public/models/manifest.json')):{},sources=JSON.parse(readFileSync('assets/bike-bases/sources.json'));
+ if(selected.some(id=>!BIKES.some(b=>b.id===id)))throw new Error('Unknown motorcycle selected for export');
+ for(const bike of BIKES.filter(b=>!selected.length||selected.includes(b.id))){
   const result=await page.evaluate(async ({id,licensed})=>{
    const {buildBike}=await import('/src/models.js'),{referenceDetails}=await import('/src/motorcycles.js'),{BIKE_VISUALS,BIKE_RIGS}=await import('/src/bike-specs.js'),{bikeById}=await import('/shared/game.js'),{disposeBike,riderModel,optimize}=await import('/src/model-geometry.js'),{GLTFExporter}=await import('/node_modules/three/examples/jsm/exporters/GLTFExporter.js'),{GLTFLoader}=await import('/node_modules/three/examples/jsm/loaders/GLTFLoader.js');
    let root;
@@ -19,7 +20,7 @@ try{
    const bytes=new Uint8Array(await new GLTFExporter().parseAsync(root,{binary:true}));let binary='';for(let i=0;i<bytes.length;i+=8192)binary+=String.fromCharCode(...bytes.subarray(i,i+8192));disposeBike(root);return {base64:btoa(binary),triangles,drawCalls};
   },{id:bike.id,licensed:!!sources[bike.id]&&existsSync(`assets/bike-bases/${bike.id}.glb`)});
   const file=`${bike.id}.glb`,bytes=Buffer.from(result.base64,'base64');writeFileSync(`public/models/${file}`,bytes);
-  manifest[bike.id]={file,revision:3,...(sources[bike.id]||{author:'Moto Rift project',license:'MIT'}),kind:sources[bike.id]?'licensed-reference-adaptation':'original-reference-model',units:'meters',forward:'+Z',triangles:result.triangles,drawCalls:result.drawCalls,bytes:bytes.length};console.log(`${bike.name}: ${result.triangles} triangles, ${result.drawCalls} meshes, ${Math.round(bytes.length/1024)} KB`);
+  manifest[bike.id]={file,revision:bike.id==='winner'?5:3,...(sources[bike.id]||{author:'Moto Rift project',license:'MIT'}),kind:sources[bike.id]?'licensed-reference-adaptation':'original-reference-model',units:'meters',forward:'+Z',triangles:result.triangles,drawCalls:result.drawCalls,bytes:bytes.length};console.log(`${bike.name}: ${result.triangles} triangles, ${result.drawCalls} meshes, ${Math.round(bytes.length/1024)} KB`);
  }
  writeFileSync('public/models/manifest.json',JSON.stringify(manifest,null,2)+'\n');
 }finally{await browser?.close();await server.close();}
