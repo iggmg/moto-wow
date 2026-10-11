@@ -61,3 +61,5 @@ button{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-web
 @media(max-height:540px) and (orientation:landscape) and (pointer:coarse){.guidance-wrap{right:auto;width:230px}.hud-top{grid-template-columns:90px 1fr 44px}.hud-bottom{bottom:calc(max(10px,env(safe-area-inset-bottom)) + 108px)}#hud.menu-open .hud-left{max-height:calc(100dvh - 90px);width:230px}#hud.menu-open .race-controls{top:65px;right:10px;width:290px;display:grid;grid-template-columns:1fr 1fr;padding-top:54px}#hud.menu-open .hud-top #race-exit{width:278px;top:71px;right:16px}.pursuit-warning,.offroad-feedback,.damage-feedback{top:64px;max-width:35%;left:50%}.touch-controls .touch-pedals [data-control=throttle]{height:104px}}
 
 @media(max-width:640px),(pointer:coarse){#hud:has(#damage-feedback:not([hidden])) #offroad-feedback,#hud:has(#damage-feedback:not([hidden])) #pursuit-warning,#hud:has(#offroad-feedback:not([hidden])) #pursuit-warning{visibility:hidden}}
+
+.asset-credits{font-size:10px;color:#a5b5a4;margin-top:12px;line-height:1.7}.asset-credits summary{cursor:pointer;padding:8px 0}.asset-credits a{text-decoration:underline}.asset-credits p{margin:8px 0}

@@ -29,6 +29,7 @@ function visor(g,center,rx,ry,rz,m){
 }
 function limb(g,a,b,ra,rb,m){const A=new T.Vector3(...a),B=new T.Vector3(...b),v=B.clone().sub(A);const o=add(g,new T.CylinderGeometry(rb,ra,v.length(),16,1),m);o.position.copy(A.add(B).multiplyScalar(.5));o.quaternion.setFromUnitVectors(new T.Vector3(0,1,0),v.normalize());ellipsoid(g,...a,ra,ra,ra,m);ellipsoid(g,...b,rb,rb,rb,m);}
 function riderModel(b){
+ const riderEllipsoid=(g,x,y,z,sx,sy,sz,m)=>{const o=add(g,new T.SphereGeometry(1,16,12),m,x,y,z);o.scale.set(sx,sy,sz);return o;};
  const g=new T.Group();g.name='Rider';g.userData.dynamic=true;
  const suit=mat(0x384644,0,.86),panels=mat(0x889385,0,.79),trim=mat(0xc6652e,0,.65),armor=mat(0x14181b,.1,.55),helmet=mat(0xdfded7,.2,.24),glass=mat(0x10222a,.65,.12);
  const seatY=b.seatY;
@@ -36,30 +37,30 @@ function riderModel(b){
  const pos=[],indices=[],rings=[[.12,.145,.10],[.23,.16,.112],[.35,.19,.12],[.47,.225,.13],[.54,.21,.115],[.59,.085,.07]],segments=24;
  for(let i=0;i<rings.length;i++){const [y,rx,rz]=rings[i];for(let j=0;j<=segments;j++){const a=j/segments*6.283185;pos.push(Math.sin(a)*rx,seatY+y,-.34+y*.24+Math.cos(a)*rz);if(i<rings.length-1&&j<segments){const k=i*(segments+1)+j;indices.push(k,k+1,k+segments+1,k+1,k+segments+2,k+segments+1);}}}
  const geo=new T.BufferGeometry();geo.setAttribute('position',new T.Float32BufferAttribute(pos,3));geo.setIndex(indices);geo.computeVertexNormals();add(g,geo,suit);
- ellipsoid(g,0,seatY+.09,-.35,.16,.08,.12,suit);
- const back=ellipsoid(g,0,seatY+.35,-.41,.125,.17,.018,panels);back.rotation.x=.2;
+ riderEllipsoid(g,0,seatY+.09,-.35,.16,.08,.12,suit);
+ const back=riderEllipsoid(g,0,seatY+.35,-.41,.125,.17,.018,panels);back.rotation.x=.2;
  for(const side of [-1,1])curvedTube(g,[[side*.12,seatY+.52,-.33],[side*.10,seatY+.34,-.44],[side*.07,seatY+.18,-.39]],.009,trim);
  for(const side of [-1,1]){
-  const shoulder=[side*.21,seatY+.51,-.19],elbow=[side*.29,seatY+.29,.05],wrist=[side*.30,(b.class==='adventure'?1.12:b.class==='naked'?1.04:b.id==='cub'?1:1.01)+.048,b.wheelbase/2-.20];
+  const shoulder=[side*.21,seatY+.51,-.19],elbow=[side*.29,seatY+.29,.05],wrist=b.grip?[side*b.grip[0],b.grip[1],b.grip[2]]:[side*.30,(b.barY|| (b.class==='adventure'?1.12:b.class==='naked'?1.04:b.id==='cub'?1:1.01))+.048,b.wheelbase/2-.20];
   limb(g,shoulder,elbow,.092,.068,suit);limb(g,elbow,wrist,.066,.047,panels);
-  ellipsoid(g,...shoulder,.095,.078,.095,panels);ellipsoid(g,...elbow,.069,.065,.072,armor);
+  riderEllipsoid(g,...shoulder,.099,.099,.099,panels);riderEllipsoid(g,...elbow,.075,.075,.075,armor);
   curvedTube(g,[[side*.16,seatY+.55,-.25],[side*.25,seatY+.48,-.14],[side*.28,seatY+.33,-.01]],.013,trim);
-  ellipsoid(g,...wrist,.052,.043,.066,armor);for(let finger=0;finger<4;finger++)ellipsoid(g,wrist[0]+(finger-1.5)*.015,wrist[1]+.028,wrist[2]+.035,.007,.009,.022,panels);
+  riderEllipsoid(g,...wrist,.052,.043,.066,armor);for(let finger=0;finger<4;finger++)riderEllipsoid(g,wrist[0]+(finger-1.5)*.015,wrist[1]+.028,wrist[2]+.035,.007,.009,.022,panels);
   const hip=[side*.135,seatY+.06,-.35],knee=[side*.22,.62,.14],ankle=[side*.23,.39,-.06];
   limb(g,hip,knee,.105,.078,suit);limb(g,knee,ankle,.075,.058,panels);
-  ellipsoid(g,side*.235,.63,.17,.082,.10,.035,armor);
-  ellipsoid(g,side*.23,.39,-.035,.065,.095,.09,armor);ellipsoid(g,side*.23,.355,.04,.066,.045,.135,armor);
+  riderEllipsoid(g,side*.235,.63,.17,.082,.10,.035,armor);
+  riderEllipsoid(g,side*.23,.39,-.035,.065,.095,.09,armor);riderEllipsoid(g,side*.23,.355,.04,.066,.045,.135,armor);
   box(g,side*.23,.32,.03,.125,.018,.23,rubber);
   for(let i=0;i<3;i++)box(g,side*.23,.43+i*.028,-.01,.13,.01,.11,trim);
  }
  limb(g,[0,seatY+.54,-.15],[0,seatY+.63,-.13],.07,.064,armor);
  const headY=seatY+.77;
- ellipsoid(g,0,headY,-.105,.17,.195,.18,helmet);
+ riderEllipsoid(g,0,headY,-.105,.17,.195,.18,helmet);
  visor(g,[0,headY,-.105],.174,.198,.184,glass);
  // Jaw protector and a separate chin vent give the helmet a full-face silhouette.
- ellipsoid(g,0,headY-.095,.012,.14,.061,.105,helmet);
- box(g,0,headY-.092,.105,.095,.033,.011,armor);
- for(const x of [-.13,.13])ellipsoid(g,x,headY-.015,-.065,.013,.027,.027,steel);
+ riderEllipsoid(g,0,headY-.095,.012,.14,.061,.105,helmet);
+ box(g,0,headY-.092,.122,.095,.033,.011,armor);
+ for(const x of [-.13,.13])riderEllipsoid(g,x,headY-.015,-.065,.013,.027,.027,steel);
  curvedTube(g,[[0,headY-.12,-.25],[0,headY+.14,-.24],[0,headY+.196,-.10],[0,headY+.16,.02]],.019,trim);
  box(g,0,seatY+.39,-.085,.008,.22,.013,black);
  optimize(g);return g;
@@ -70,14 +71,27 @@ function optimize(group){
   const inverse=new T.Matrix4().copy(group.matrixWorld).invert();
   group.traverse(o=>{
     if(!o.isMesh)return;let p=o.parent;while(p&&p!==group){if(p.userData.dynamic)return;p=p.parent;}
-    const key=o.material.uuid;if(!buckets.has(key))buckets.set(key,{mat:o.material,geos:[]});
-    const geo=o.geometry.index?o.geometry.toNonIndexed():o.geometry.clone();
-    if(!geo.attributes.uv)geo.setAttribute('uv',new T.Float32BufferAttribute(new Float32Array(geo.attributes.position.count*2),2));
-    buckets.get(key).geos.push(geo.applyMatrix4(new T.Matrix4().multiplyMatrices(inverse,o.matrixWorld)));
+    const transform=new T.Matrix4().multiplyMatrices(inverse,o.matrixWorld);
+    const source=o.geometry.index?o.geometry.toNonIndexed():o.geometry.clone();
+    if(!source.attributes.uv)source.setAttribute('uv',new T.Float32BufferAttribute(new Float32Array(source.attributes.position.count*2),2));
+    const parts=Array.isArray(o.material)?source.groups.map(g=>({start:g.start,count:g.count,material:o.material[g.materialIndex]})):[{start:0,count:source.attributes.position.count,material:o.material}];
+    for(const part of parts){
+      if(!part.material||!part.count)continue;
+      const geo=new T.BufferGeometry();
+      for(const [name,attribute]of Object.entries(source.attributes)){
+        // Flatten interleaved attributes before merging the imported material groups.
+        const values=new attribute.array.constructor(part.count*attribute.itemSize);
+        for(let i=0;i<part.count;i++)for(let j=0;j<attribute.itemSize;j++)values[i*attribute.itemSize+j]=attribute.getComponent(part.start+i,j);
+        geo.setAttribute(name,new T.BufferAttribute(values,attribute.itemSize,attribute.normalized));
+      }
+      const key=part.material.uuid;if(!buckets.has(key))buckets.set(key,{mat:part.material,geos:[]});
+      buckets.get(key).geos.push(geo.applyMatrix4(transform));
+    }
+    source.dispose();
   });
   for(const c of group.children)if(c.userData.dynamic)dynamic.push(c);
   group.clear();for(const c of dynamic)group.add(c);
-  for(const b of buckets.values()){const combined=mergeGeometries(b.geos,false),merged=combined?mergeVertices(combined):null;if(merged)add(group,merged,b.mat);for(const geo of b.geos)geo.dispose();}
+  for(const b of buckets.values()){const common=Object.keys(b.geos[0].attributes).filter(name=>b.geos.every(g=>g.attributes[name]));for(const geo of b.geos)for(const name of Object.keys(geo.attributes))if(!common.includes(name))geo.deleteAttribute(name);const combined=mergeGeometries(b.geos,false),merged=combined?mergeVertices(combined):null;if(merged)add(group,merged,b.mat);for(const geo of b.geos)geo.dispose();}
 }
 
 export { mat,add,box,ellipsoid,tube,profile,shell,curvedTube,bolt,fender,limb,riderModel,optimize };

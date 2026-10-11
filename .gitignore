@@ -17,3 +17,6 @@ artifacts/public-source/
 artifacts/backups/
 
 artifacts/online-verification/
+
+# Local reports, research inputs and backups are private.
+artifacts/
