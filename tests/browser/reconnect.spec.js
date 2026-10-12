@@ -1,0 +1,10 @@
+import {test,expect} from '@playwright/test';
+test('a broken socket reconnects to the same rider, keeps gates/health and resumes input with server acknowledgement',async({page})=>{
+ const errors=[];page.on('pageerror',e=>errors.push(e.message));await page.goto('/');const nickname='Reconnect'+Date.now().toString(36);
+ await page.locator('#account-open').click();await page.getByRole('button',{name:'Первый заезд? Создать аккаунт'}).click();await page.getByLabel('Ник гонщика').fill(nickname);await page.getByLabel('Пароль',{exact:true}).fill('only-this-test-password');await page.getByRole('button',{name:'Создать аккаунт →',exact:true}).click();await expect(page.locator('#auth-dialog')).toBeHidden();
+ await page.locator('#online-open').click();await page.locator('#room-mode').selectOption('open');await page.locator('#room-code').fill('RESUME-'+Date.now().toString(36).slice(-6));await page.locator('#online-submit').click();await expect(page.locator('#hud')).toBeVisible();
+ const before=await page.evaluate(()=>({id:window.__motoRace.id,gate:window.__motoRace.state.nextGate,health:window.__motoRace.state.health,room:window.__motoRace.connection.message.room}));
+ await page.context().setOffline(true);await page.waitForTimeout(1000);await page.context().setOffline(false);
+ await expect.poll(()=>page.evaluate(()=>window.__motoRace.connection?.message.resumed===true),{timeout:15000}).toBe(true);const after=await page.evaluate(()=>({id:window.__motoRace.id,gate:window.__motoRace.state.nextGate,health:window.__motoRace.state.health,room:window.__motoRace.connection.message.room,paused:window.__motoRace.paused}));expect(after.id).toBe(before.id);expect(after.gate).toBe(before.gate);expect(after.health).toBe(before.health);expect(after.room).toBe(before.room);expect(after.paused).toBe(false);
+ await page.keyboard.down('w');await expect.poll(()=>page.evaluate(()=>window.__motoRace.state.speed),{timeout:10000}).toBeGreaterThan(2);await page.keyboard.up('w');expect(errors).toEqual([]);
+});

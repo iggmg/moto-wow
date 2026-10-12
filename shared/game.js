@@ -1,8 +1,10 @@
+import {tunedBike} from './tuning.js';
+import {ORC_ROLES,ROLE_WEAPONS,perceives} from './perception.js';
 import { friendlyTo,strikeOrc } from './arcade.js';
 import { damageRider } from './health.js';
-export const VERSION = 14;
+export const VERSION = 15;
 export const STEP = 1 / 60;
-import {DEFAULT_TRACK,PHYSICS_VERSION,CHECKPOINTS,trackData,trackById,trackPoint,trackHeading,nearestTrack,groundHeight,baseHeight,rampAt,featureCoords,surfaceAt,ORCS} from './tracks.js';
+import {DEFAULT_TRACK,PHYSICS_VERSION,CHECKPOINTS,trackData,trackById,trackPoint,trackHeading,routeHeading,routeScale,nearestTrack,groundHeight,baseHeight,rampAt,featureCoords,surfaceAt,ORCS} from './tracks.js';
 export * from './tracks.js';
 export const BIKES = [
   { id:'cub', name:'Honda CUB', type:'Классика · тёмный кузов, кремовый щит', color:0x172b27, maxSpeed:24, acceleration:5.5, handling:1.2, mudGrip:.68, wheel:.30, wheelbase:1.22, seatY:.75, mass:110, label:'CUB', class:'underbone' },
@@ -19,12 +21,12 @@ export const WEATHER=['clear','rain','snow'];
 export const WEATHER_LABELS={clear:'Ясно',rain:'Дождь',snow:'Снег'};
 // Advice only: this never modifies steering, throttle or checkpoint progress.
 export function cornerAdvice(s,weather='clear'){
-  const id=s.trackId||DEFAULT_TRACK,data=trackData(id),near=nearestTrack(s.x,s.z,id);let bend=0,turn=0;
-  for(let distance=5;distance<=Math.max(20,Math.min(45,s.speed*2));distance+=5){
-    const curve=angleDiff(trackHeading(near.t+(distance+3)/data.length,id),trackHeading(near.t+(distance-3)/data.length,id))/6;
+  const id=s.trackId||DEFAULT_TRACK,data=trackData(id),near=nearestTrack(s.x,s.z,id,s.branchId);let bend=0,turn=0;
+  for(let distance=5;distance<=Math.max(20,Math.min(s.scoutActive?65:45,s.speed*2+(s.scoutActive?15:0)));distance+=5){
+    const curve=angleDiff(routeHeading(near.t+(distance+3)/(data.length*routeScale(id,near.branchId)),id,near.branchId),routeHeading(near.t+(distance-3)/(data.length*routeScale(id,near.branchId)),id,near.branchId))/6;
     if(Math.abs(curve)>bend){bend=Math.abs(curve);turn=Math.sign(curve);}
   }
-  const speed=clamp(Math.sqrt((weather==='snow'?4.5:weather==='rain'?5.5:7)/Math.max(.008,bend))*.78,4,bikeById(s.bike).maxSpeed);
+  const speed=clamp(Math.sqrt((weather==='snow'?4.5:weather==='rain'?5.5:7)/Math.max(.008,bend))*.78,4,tunedBike(bikeById(s.bike),s.setup).maxSpeed);
   return {tight:bend>.025,brake:bend>.015&&s.speed>speed+1,speed,side:turn<0?'направо':'налево'};
 }
 export function orcPosition(orc,time) {
@@ -32,27 +34,28 @@ export function orcPosition(orc,time) {
   return {x:orc.x+Math.cos(orc.heading)*cross,z:orc.z-Math.sin(orc.heading)*cross};
 }
 export function createOrcs(time=0,trackId=DEFAULT_TRACK) {
-  return trackData(trackId).ORCS.map(home=>({...orcPosition(home,time),id:home.id,trackId:home.trackId,yaw:home.heading,mode:'patrol',targetId:null,speed:0,attackCooldown:0}));
+  return trackData(trackId).ORCS.map(home=>({...orcPosition(home,time),id:home.id,role:ORC_ROLES[home.id%ORC_ROLES.length],weapon:ROLE_WEAPONS[ORC_ROLES[home.id%ORC_ROLES.length]],trackId:home.trackId,yaw:home.heading,mode:'patrol',targetId:null,speed:0,attackCooldown:0}));
 }
 // The same fixed-step AI runs locally in training and once per authoritative room.
 export function stepOrcs(orcs,riders,dt=STEP,time=0) {
   for(const orc of orcs) {
     const home=trackData(orc.trackId).ORCS[orc.id];
-    let target=riders.find(r=>r.id===orc.targetId&&r.health!==0&&!r.finished&&!friendlyTo(orc,r.id,time));
+    let target=riders.find(r=>r.id===orc.targetId&&!r.practice?.noEnemies&&!r.safeCamp&&r.health!==0&&!r.finished&&!friendlyTo(orc,r.id,time));
     const distance=r=>Math.hypot(r.x-orc.x,r.z-orc.z);
     if(!target||distance(target)>100||Math.hypot(orc.x-home.x,orc.z-home.z)>110)target=null;
+    if(target){if(perceives(orc,target,time)){orc.lastSeen=time;orc.lastSeenX=target.x;orc.lastSeenZ=target.z;}else if(time-(orc.lastSeen??-99)>2.5)target=null;}
     if(!target) {
       let nearest=Infinity;
       for(const rider of riders) {
-        if(rider.health===0||rider.finished||friendlyTo(orc,rider.id,time))continue;
-        const d=distance(rider),alert=rider.arcade?.huntUntil>time?100:Math.abs(rider.speed)<1?90:36;
-        if(d<alert&&d<nearest&&Math.hypot(rider.x-home.x,rider.z-home.z)<110){target=rider;nearest=d;}
+        if(rider.practice?.noEnemies||rider.safeCamp||rider.health===0||rider.finished||friendlyTo(orc,rider.id,time))continue;
+        const d=distance(rider),alert=rider.arcade?.huntUntil>time&&rider.arcade.huntWitnesses?.includes(orc.id)?100:Math.abs(rider.speed)<1?90:36;
+        if(d<alert&&d<nearest&&perceives(orc,rider,time)&&Math.hypot(rider.x-home.x,rider.z-home.z)<110){target=rider;nearest=d;orc.lastSeen=time;orc.lastSeenX=rider.x;orc.lastSeenZ=rider.z;}
       }
     }
     orc.targetId=target?.id??null;
-    const goal=target||orcPosition(home,time),d=Math.hypot(goal.x-orc.x,goal.z-orc.z);
+    const goal=target&&time-(orc.lastSeen??time)>.1?{x:orc.lastSeenX,z:orc.lastSeenZ}:target||orcPosition(home,time),d=Math.hypot(goal.x-orc.x,goal.z-orc.z);
     orc.attackCooldown=Math.max(0,orc.attackCooldown-dt);
-    if(target&&d<1.4&&orc.attackCooldown===0)orc.attackCooldown=1.2;
+    if(target&&d<1.4&&orc.attackCooldown===0){orc.attackCooldown=1.2;if(time-(orc.lastBark??-99)>12){orc.lastBark=time;orc.bark=['Я не злой. Я голодный.','Доставка приехала! А еда где?','Копьё верни после финиша!','Бензин твой, аппетит мой.'][orc.id%4];orc.barkUntil=time+2.5;}}
     orc.mode=target?(orc.attackCooldown>0?'attack':'chase'):Math.hypot(orc.x-home.x,orc.z-home.z)>10?'return':'patrol';
     // Swing recovery gives even a slow bike time to pull away from contact.
     const speed=orc.mode==='attack'||orc.windup>0?0:target?4.2:orc.mode==='return'?4:2.2;
@@ -72,21 +75,21 @@ export function createRider(bike='cub',slot=0,trackId=DEFAULT_TRACK) {
 export function resetRider(s) {
   if(s.health===0||s.finished)return;
   const gate=Math.max(0,s.nextGate-1),t=gate/CHECKPOINTS,p=trackPoint(t,s.trackId);
-  if(s.arcade&&s.arcade.fuel===0)s.arcade.fuel=20;s.contactShield=2;s.contactVX=0;s.contactVZ=0;s.x=p.x;s.z=p.z;s.yaw=trackHeading(t,s.trackId);s.travelYaw=s.yaw;s.slipAngle=0;s.obstacleContact=null;s.rearBrake=0;s.yawRate=0;s.lean=0;s.pitch=0;s.speed=0;s.offRoad=false;s.offRoadTime=0;s.roadRecovery=0;s.offRoadCharged=false;s.y=groundHeight(p.x,p.z,s.trackId);s.vy=0;s.airborne=false;s.lastRamp=null;s.penalty+=5;s.totalPenalty=(s.totalPenalty||0)+5;
+  if(s.arcade&&s.arcade.fuel===0)s.arcade.fuel=20;s.contactShield=2;s.contactVX=0;s.contactVZ=0;s.x=p.x;s.z=p.z;s.yaw=trackHeading(t,s.trackId);s.travelYaw=s.yaw;s.slipAngle=0;s.obstacleContact=null;s.rearBrake=0;s.yawRate=0;s.lean=0;s.pitch=0;s.speed=0;s.offRoad=false;s.offRoadTime=0;s.roadRecovery=0;s.offRoadCharged=false;s.y=groundHeight(p.x,p.z,s.trackId);s.vy=0;s.airborne=false;s.lastRamp=null;s.penalty+=s.practice?.training?0:5;s.totalPenalty=(s.totalPenalty||0)+(s.practice?.training?0:5);
 }
 export function normalizeInput(input={}) {
   if(!input||typeof input!=='object')input={};
   return {throttle:clamp(Number(input.throttle)||0,0,1),brake:clamp(Number(input.brake)||0,0,1),rearBrake:clamp(Number(input.rearBrake)||0,0,1),reverse:clamp(Number(input.reverse)||0,0,1),steer:clamp(Number(input.steer)||0,-1,1)};
 }
-export function stepRider(s,rawInput,dt=STEP,time=0,orcs=null,weather='clear') {
+export function stepRider(s,rawInput,dt=STEP,time=0,orcs=null,weather='clear',extraObstacles=[]) {
   if(s.health===0||s.finished){s.speed=0;return null;}
   s.raceTime=(s.raceTime||0)+dt;s.contactShield=Math.max(0,(s.contactShield||0)-dt);
   const {GATES,RAMPS,ORCS,OBSTACLES}=trackData(s.trackId);
-  const input=normalizeInput(rawInput),bike=bikeById(s.bike),surface=surfaceAt(s.x,s.z,weather,s.trackId);
-  s.surface=surface.name;s.hitCooldown=Math.max(0,s.hitCooldown-dt);s.lapTime+=dt;
+  const input=normalizeInput(rawInput),bike=tunedBike(bikeById(s.bike),s.setup),surface=surfaceAt(s.x,s.z,weather,s.trackId,s.branchId);
+  s.scoutActive=s.arcade?.scoutUntil>time;s.branchId=surface.branchId;s.surface=surface.name;s.hitCooldown=Math.max(0,s.hitCooldown-dt);s.lapTime+=dt;
   const baseGrip={mud:bike.mudGrip,grass:.43,sand:.62,water:.48,snow:.45}[surface.name]??1;
   const slip=s.arcade?.slipUntil>time,boost=s.arcade?.boostUntil>time;const grip=baseGrip*(slip?.32:1)*(weather==='rain'?.80:1)*(surface.offRoad?.65:1),drag={mud:1.5,grass:2.5,sand:1.6,water:2.2,snow:1.1}[surface.name]||0;
-  const max=(s.arcade?.fuel===0?6:bike.maxSpeed*(boost?1.22:1))*Math.min(surface.offRoad?.45:1,({mud:.53+grip*.3,grass:.5,sand:.7,water:.55,snow:.68}[surface.name]??1));
+  const max=(s.arcade?.fuel===0?6:bike.maxSpeed*(boost?1.22:1)*(s.cargoCarrier?.92:1))*Math.min(surface.offRoad?.45:1,({mud:.53+grip*.3,grass:.5,sand:.7,water:.55,snow:.68}[surface.name]??1));
   // Snow remains slippery for steering; low gear still supplies enough drive to restart uphill.
   const roadDrive=surface.name==='snow'?.80*(slip?.32:1):grip,driveGrip=surface.offRoad?Math.max(.60,roadDrive*.8)*(slip?.32:1):roadDrive;
   const previous={x:s.x,z:s.z};
@@ -102,7 +105,7 @@ export function stepRider(s,rawInput,dt=STEP,time=0,orcs=null,weather='clear') {
     else if(input.throttle>0||braking>0)s.speed=Math.min(0,s.speed+(14*input.throttle+braking+resistance)*dt);
     else {const reverseDrive=input.reverse*bike.acceleration*Math.max(.8,driveGrip);s.speed=-clamp(-s.speed+(reverseDrive-resistance-(input.reverse===0?2:0))*dt,0,3);}
   }
-  else {const acceleration=drive*bike.acceleration*driveGrip*(boost?1.8:1),overspeed=Math.max(0,s.speed-max)*2;s.speed=Math.max(0,s.speed+(Math.min(acceleration,Math.max(0,max-s.speed)/dt)-braking-resistance-overspeed)*dt);}
+  else {const acceleration=drive*bike.acceleration*driveGrip*(boost?1.8:1)*(s.cargoCarrier?.9:1),overspeed=Math.max(0,s.speed-max)*2;s.speed=Math.max(0,s.speed+(Math.min(acceleration,Math.max(0,max-s.speed)/dt)-braking-resistance-overspeed)*dt);}
   s.steer+=(input.steer-s.steer)*(1-Math.exp(-dt*11));
   const magnitude=Math.abs(s.speed),authority=bike.handling*((.35+magnitude*.042)/(1+magnitude*.018)+.75/(1+(magnitude/12)**2))*Math.sqrt(.65+.35*grip)*(surface.offRoad?.72:1);
   const rate=Math.min(authority,(11+magnitude*.25)/Math.max(1,magnitude));
@@ -128,9 +131,10 @@ export function stepRider(s,rawInput,dt=STEP,time=0,orcs=null,weather='clear') {
   }
   if(s.airborne){s.vy-=9.81*dt;s.y+=s.vy*dt;if(s.y<=gy){s.y=gy;s.vy=0;s.airborne=false;}}
   else {s.y=gy;s.vy=0;}
-  if(s.obstacleContact!==null){const held=OBSTACLES[s.obstacleContact];if(!held||Math.hypot(s.x-held.x,s.z-held.z)>held.radius+.65)s.obstacleContact=null;}
+  const solids=extraObstacles.length?OBSTACLES.concat(extraObstacles):OBSTACLES;
+  if(s.obstacleContact!==null){const held=s.obstacleContact<0?extraObstacles.find(o=>o.id===s.obstacleContact):OBSTACLES[s.obstacleContact];if(!held||Math.hypot(s.x-held.x,s.z-held.z)>held.radius+.65)s.obstacleContact=null;}
   {
-    for(const obstacle of OBSTACLES){
+    for(const obstacle of solids){
       const bound=obstacle.radius+.5;if(Math.min(previous.x,s.x)>obstacle.x+bound||Math.max(previous.x,s.x)<obstacle.x-bound||Math.min(previous.z,s.z)>obstacle.z+bound||Math.max(previous.z,s.z)<obstacle.z-bound)continue;
       if(s.airborne&&s.y>groundHeight(obstacle.x,obstacle.z,s.trackId)+obstacle.height+.1)continue;
       const radius=obstacle.radius+.5,mx=s.x-previous.x,mz=s.z-previous.z,ox=previous.x-obstacle.x,oz=previous.z-obstacle.z;
@@ -139,7 +143,7 @@ export function stepRider(s,rawInput,dt=STEP,time=0,orcs=null,weather='clear') {
       if(t===null)continue;
       let nx=ox+mx*t,nz=oz+mz*t,len=Math.hypot(nx,nz);if(len<.0001){nx=-Math.sin(s.travelYaw);nz=-Math.cos(s.travelYaw);len=1;}nx/=len;nz/=len;
       let vx=Math.sin(s.travelYaw)*s.speed+(s.contactVX||0),vz=Math.cos(s.travelYaw)*s.speed+(s.contactVZ||0);
-      const impact=Math.max(0,-(vx*nx+vz*nz)),fresh=s.obstacleContact!==obstacle.id;
+      const impact=Math.max(0,-((vx-(obstacle.vx||0))*nx+(vz-(obstacle.vz||0))*nz)),fresh=s.obstacleContact!==obstacle.id;
       if(fresh&&impact>1.5)damageRider(s,obstacle.type,impact);
       if(impact>1.5)s.obstacleContact=obstacle.id;
       // Remove motion into the solid object; a glancing contact keeps its tangent.
@@ -149,10 +153,10 @@ export function stepRider(s,rawInput,dt=STEP,time=0,orcs=null,weather='clear') {
       if(Math.abs(s.speed)>.01)s.travelYaw=Math.atan2(vx*direction,vz*direction);s.slipAngle=angleDiff(s.travelYaw,s.yaw);s.y=groundHeight(s.x,s.z,s.trackId);
     }
   }
-  const endSurface=surfaceAt(s.x,s.z,weather,s.trackId);s.offRoad=endSurface.offRoad;s.surface=endSurface.name;
+  const endSurface=surfaceAt(s.x,s.z,weather,s.trackId,s.branchId);s.offRoad=endSurface.offRoad;s.branchId=endSurface.branchId;s.surface=endSurface.name;
   // A short verge touch is forgiven; prolonged shortcuts cost race time, never health.
-  if(!s.airborne){
-    if(endSurface.distance>trackById(s.trackId).width/2+.6){
+  if(!s.airborne&&!s.practice?.training){
+    if(endSurface.distance>endSurface.width/2+.6){
       s.roadRecovery=0;s.offRoadTime=(s.offRoadTime||0)+dt;
       if(s.offRoadTime>=1){const added=s.offRoadCharged?1:3;s.offRoadCharged=true;s.offRoadTime-=1;s.offRoadPenalty=(s.offRoadPenalty||0)+added;s.penalty+=added;s.totalPenalty=(s.totalPenalty||0)+added;s.offRoadPenaltyAt=s.raceTime;}
     }else{s.roadRecovery=(s.roadRecovery||0)+dt;if(s.roadRecovery>=1){s.offRoadTime=0;s.offRoadCharged=false;}}
@@ -161,15 +165,13 @@ export function stepRider(s,rawInput,dt=STEP,time=0,orcs=null,weather='clear') {
     const enemies=orcs||ORCS.map(o=>orcPosition(o,time));
     const enemy=enemies.find(o=>Math.hypot(o.x-s.x,o.z-s.z)<1.4);
     if(enemy&&s.arcade&&s.speed>=6)strikeOrc(s,enemy,enemies,time);
-    const melee=enemy&&!friendlyTo(enemy,s.id,time);
+    const melee=!s.practice?.noEnemies&&enemy&&!friendlyTo(enemy,s.id,time);
     if(melee)damageRider(s,'melee',s.speed);
   }
   if(s.health===0)return null;
-  const gate=GATES[s.nextGate%CHECKPOINTS];
-  const gateYaw=trackHeading(gate.t,s.trackId),gx=Math.sin(gateYaw),gz=Math.cos(gateYaw),before=(previous.x-gate.x)*gx+(previous.z-gate.z)*gz,after=(s.x-gate.x)*gx+(s.z-gate.z)*gz;
-  const crossing=before<=0&&after>0,at=crossing?-before/(after-before):0,crossX=previous.x+(s.x-previous.x)*at,crossZ=previous.z+(s.z-previous.z)*at;
-  // Ordered gate planes count actual forward travel, including legitimate jumps.
-  if(crossing&&!s.offRoad&&Math.abs((crossX-gate.x)*gz-(crossZ-gate.z)*gx)<=trackById(s.trackId).width/2) {
+  const gate=GATES[s.nextGate%CHECKPOINTS],candidates=[{...gate,heading:trackHeading(gate.t,s.trackId),width:trackById(s.trackId).width},...(gate.alternatives||[])];
+  const crossed=candidates.some(g=>{const gx=Math.sin(g.heading),gz=Math.cos(g.heading),before=(previous.x-g.x)*gx+(previous.z-g.z)*gz,after=(s.x-g.x)*gx+(s.z-g.z)*gz;if(!(before<=0&&after>0))return false;const at=-before/(after-before),crossX=previous.x+(s.x-previous.x)*at,crossZ=previous.z+(s.z-previous.z)*at;return Math.abs((crossX-g.x)*gz-(crossZ-g.z)*gx)<=g.width/2;});
+  if(crossed&&!s.offRoad) {
     s.nextGate++;
     if(s.nextGate>CHECKPOINTS) {
       s.last=s.lapTime+s.penalty;s.best=s.best?Math.min(s.best,s.last):s.last;

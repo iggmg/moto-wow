@@ -38,7 +38,7 @@ test('all 72 bike/course/weather combinations complete inside the road at useful
 });
 test('winding routes change turn direction, leave clearance between arms and never cross road edges',()=>{
  const cross=(a,b,c)=>(b.x-a.x)*(c.z-a.z)-(b.z-a.z)*(c.x-a.x),intersects=(a,b,c,d)=>cross(a,b,c)*cross(a,b,d)<0&&cross(c,d,a)*cross(c,d,b)<0;
- for(const track of TRACKS){const data=trackData(track.id),points=data.TRACK;assert.equal(track.revision,2);assert.deepEqual(trackPoint(0,track.id),trackPoint(1,track.id));assert(Math.abs(angleDiff(trackHeading(.99999,track.id),trackHeading(.00001,track.id)))<.01);
+ for(const track of TRACKS){const data=trackData(track.id),points=data.TRACK;assert.equal(track.revision,track.branches?.length?3:2);assert.deepEqual(trackPoint(0,track.id),trackPoint(1,track.id));assert(Math.abs(angleDiff(trackHeading(.99999,track.id),trackHeading(.00001,track.id)))<.01);
   let turns=0,last=0;for(let i=0;i<1024;i++){const curve=angleDiff(trackHeading((i+1)/1024,track.id),trackHeading((i-1)/1024,track.id))/(data.length*2/1024);if(Math.abs(curve)>.004){const sign=Math.sign(curve);if(last&&sign!==last)turns++;last=sign;}}assert(turns>=6,`${track.id} has alternating bends`);
   for(let a=0;a<256;a++)for(let b=a+1;b<256;b++){const separation=Math.min(b-a,256-b+a)*data.length/256;if(separation<Math.max(30,track.width*3))continue;assert(Math.hypot(points[a].x-points[b].x,points[a].z-points[b].z)>track.width+6,`${track.id} separate road arms`);}
   for(const side of [-1,1]){const edge=Array.from({length:512},(_,i)=>{const p=trackPoint(i/512,track.id),yaw=trackHeading(i/512,track.id),offset=side*(track.width/2+.9);return {x:p.x+Math.cos(yaw)*offset,z:p.z-Math.sin(yaw)*offset};});for(let a=0;a<512;a++)for(let b=a+2;b<512;b++){if(a===0&&b===511)continue;assert(!intersects(edge[a],edge[(a+1)%512],edge[b],edge[(b+1)%512]),`${track.id} road edge does not fold or cross`);}}
@@ -47,6 +47,6 @@ test('winding routes change turn direction, leave clearance between arms and nev
 });
 test('guidance follows the road, detects reverse travel and guides an off-road rider back',()=>{
  for(const track of TRACKS){for(const t of [.03,.28,.62,.9]){const p=trackPoint(t,track.id),yaw=trackHeading(t,track.id),s={...p,yaw,speed:5,trackId:track.id};let guide=routeGuidance(s);assert(!guide.offRoad&&!guide.wrongWay);assert(Number.isFinite(guide.angle));guide=routeGuidance({...s,yaw:yaw+Math.PI});assert(guide.wrongWay);assert(Math.abs(guide.angle)>2);
- const off={...s,x:p.x+Math.cos(yaw)*(track.width/2+8),z:p.z-Math.sin(yaw)*(track.width/2+8)};guide=routeGuidance(off);assert(guide.offRoad);assert(!guide.wrongWay);assert(nearestTrack(guide.target.x,guide.target.z,track.id).distance<.1);
+ let off;for(let extra=8;extra<=48;extra+=4){const candidate={...s,x:p.x+Math.cos(yaw)*(track.width/2+extra),z:p.z-Math.sin(yaw)*(track.width/2+extra)};if(surfaceAt(candidate.x,candidate.z,'clear',track.id).offRoad){off=candidate;break;}}assert(off,'a real off-road position exists beyond all legal alternatives');guide=routeGuidance(off);assert(guide.offRoad);assert(!guide.wrongWay);assert(nearestTrack(guide.target.x,guide.target.z,track.id).distance<.1);
  }}
 });

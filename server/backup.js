@@ -1,5 +1,6 @@
 import { backup,DatabaseSync } from 'node:sqlite';
 import { mkdir,chmod,rename,readdir,unlink } from 'node:fs/promises';
+import {existsSync} from 'node:fs';
 import { join } from 'node:path';
 
 // A complete SQLite backup includes committed WAL data; files never enter dist.
@@ -14,3 +15,6 @@ export async function backupStore(db,directory){
   for(const old of files.slice(7))await unlink(join(directory,old));
   console.log('Database backup verified');return path;
 }
+
+// Run before opening/migrating the live schema, including all committed WAL pages.
+export async function backupBeforeMigration(path,directory){if(!directory||path===':memory:'||!existsSync(path))return null;const db=new DatabaseSync(path,{readOnly:true});try{return await backupStore(db,join(directory,'pre-migration'));}finally{db.close();}}

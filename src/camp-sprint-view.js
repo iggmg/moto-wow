@@ -1,0 +1,4 @@
+import * as T from 'three';
+import {campRings} from '../shared/camp-sprint.js';
+import {groundHeight} from '../shared/tracks.js';
+export function createCampSprintView(scene,id){const root=new T.Group();scene.add(root);const geometry=new T.TorusGeometry(2.5,.045,4,32),materials=[],rings=campRings(id).map(p=>{const m=new T.MeshBasicMaterial({color:0xf1d28a,transparent:true,opacity:.8}),ring=new T.Mesh(geometry,m);materials.push(m);ring.position.set(p.x,groundHeight(p.x,p.z,id)+2.5,p.z);ring.rotation.y=p.heading;root.add(ring);return ring;});return {root,update(activity){root.visible=!!activity?.running;for(const [i,r]of rings.entries()){r.visible=i>=activity?.next;r.material.color.set(i===activity?.next?0xf1d28a:0x67998a);r.material.opacity=i===activity?.next?.9:.25;}},dispose(){root.removeFromParent();geometry.dispose();materials.forEach(m=>m.dispose());}};}

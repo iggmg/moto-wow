@@ -1,11 +1,17 @@
-export const DEFAULT_TRACK='rift',PHYSICS_VERSION=14,CHECKPOINTS=16;
+export const DEFAULT_TRACK='rift',PHYSICS_VERSION=15,CHECKPOINTS=16;
 export const TRACKS=[
  {id:'rift',name:'Сумеречный Разлом',difficulty:'Средняя',description:'Лесные S-повороты, две тесные петли, грязь и прыжки.',revision:2,width:12,route:[[0,108],[55,108],[110,95],[132,60],[110,28],[60,12],[70,-18],[125,-32],[135,-78],[100,-112],[48,-100],[18,-62],[-20,-86],[-65,-112],[-119,-92],[-140,-48],[-111,-12],[-50,0],[-60,32],[-124,48],[-131,84],[-76,108],[-35,108]],relief:1,weather:'clear',biome:'forest',ramps:[.115,.505],rivers:[.285,.755],mud:[[.19,.27],[.61,.70]],sand:[[.375,.46]],obstacles:[.135,.175,.31,.36,.48,.54,.72,.79,.83,.9],orcs:[.045,.30,.43,.57,.73,.86]},
  {id:'meadow',name:'Изумрудная Долина',difficulty:'Лёгкая',description:'Плавные S-повороты и широкие дуги среди пологих холмов.',revision:2,width:18,route:[[0,95],[52,95],[100,78],[110,36],[98,8],[112,-34],[92,-82],[40,-100],[-10,-92],[-58,-104],[-110,-76],[-116,-30],[-101,0],[-110,38],[-90,80],[-45,95]],relief:.35,weather:'clear',biome:'meadow',ramps:[.46],rivers:[],mud:[[.64,.68]],sand:[],obstacles:[.18,.43,.78],orcs:[.07,.58,.84]},
  {id:'canyon',name:'Речные Петли',difficulty:'Средняя',description:'Длинные речные петли, смена быстрых и тесных поворотов, три брода.',revision:2,width:12,route:[[0,112],[60,112],[122,104],[152,76],[142,40],[96,25],[42,24],[38,-8],[98,-13],[147,-29],[151,-72],[111,-113],[56,-119],[11,-97],[-3,-53],[-34,-40],[-61,-79],[-107,-110],[-151,-90],[-160,-47],[-133,-11],[-81,5],[-73,38],[-116,56],[-144,86],[-120,115],[-59,112]],relief:1.45,weather:'rain',biome:'canyon',ramps:[.10,.58],rivers:[.29,.53,.79],mud:[[.12,.19],[.65,.74]],sand:[[.34,.49]],obstacles:[.22,.32,.40,.48,.61,.70,.85,.92],orcs:[.045,.27,.45,.62,.78,.90]},
  {id:'summit',name:'Перевал Ледяного Клыка',difficulty:'Сложная',description:'Горные шпильки, затяжной серпантин и три прыжка на снегу.',revision:2,width:9,route:[[0,118],[56,118],[113,114],[144,93],[138,67],[104,61],[42,61],[12,44],[22,18],[57,14],[114,14],[142,-5],[137,-31],[106,-38],[45,-38],[16,-59],[29,-88],[72,-94],[125,-95],[145,-111],[147,-127],[132,-139],[107,-141],[59,-139],[3,-126],[-39,-102],[-54,-63],[-37,-22],[-52,13],[-100,30],[-132,59],[-128,98],[-82,122],[-35,118]],relief:3.2,weather:'snow',biome:'summit',ramps:[.085,.49,.86],rivers:[.68],mud:[[.24,.30]],sand:[[.55,.61]],obstacles:[.17,.22,.28,.34,.40,.45,.54,.59,.64,.73,.77,.86,.92],orcs:[.035,.24,.39,.55,.72,.88]}
 ];
+// These alternatives rejoin the same ordered gate graph. They are real roads,
+// not a shortcut that silently bypasses checkpoint validation.
+TRACKS.find(t=>t.id==='rift').branches=[{id:'forest',name:'Лесная тропа',start:.26,end:.35,offset:-22,width:7,surface:'dirt'},{id:'bog',name:'Топкий брод',start:.60,end:.72,offset:22,width:8,surface:'mud'}];
+TRACKS.find(t=>t.id==='canyon').branches=[{id:'ridge',name:'Каменный гребень',start:.12,end:.22,offset:-24,width:7,surface:'sand'},{id:'ford',name:'Речной обход',start:.63,end:.76,offset:24,width:8,surface:'mud'}];
+for(const t of TRACKS)if(t.branches)t.revision=3;
 export const trackById=id=>TRACKS.find(t=>t.id===id)||TRACKS[0];
+export const revisionForRules=(id,physics=PHYSICS_VERSION)=>physics<7?1:physics<15?2:trackById(id).revision;
 const routes=new Map();
 // Closed Catmull-Rom curves, resampled by distance: gates and scenery stay
 // evenly spaced even when a route mixes long straights and tight switchbacks.
@@ -34,23 +40,30 @@ export function trackData(id=DEFAULT_TRACK){
  RIVERS:config.rivers.map((t,i)=>({...feature(t,i),width:7,length:82})),
  OBSTACLES:config.obstacles.map((t,i)=>{const p=feature(t,i),offset=(i%2?1:-1)*config.width*.24;return {...p,x:p.x+Math.cos(p.heading)*offset,z:p.z-Math.sin(p.heading)*offset,radius:i%2?1.6:1.2,height:i%2?.9:1.65,type:i%2?'log':'rock'};}),
  ORCS:config.orcs.map((t,i)=>({...feature(t,i),trackId:config.id}))};
- data.length=routeData(config.id).length;data.bounds={minX:Math.min(...data.TRACK.map(p=>p.x)),maxX:Math.max(...data.TRACK.map(p=>p.x)),minZ:Math.min(...data.TRACK.map(p=>p.z)),maxZ:Math.max(...data.TRACK.map(p=>p.z))};cache.set(config.id,data);
+ data.length=routeData(config.id).length;data.BRANCHES=(config.branches||[]).map(branch=>{const a=trackPoint(branch.start,config.id),b=trackPoint(branch.end,config.id),ha=trackHeading(branch.start,config.id),hb=trackHeading(branch.end,config.id),length=Math.hypot(b.x-a.x,b.z-a.z),normal={x:(b.z-a.z)/length,z:-(b.x-a.x)/length},controls=[a,{x:a.x+Math.sin(ha)*length*.18,z:a.z+Math.cos(ha)*length*.18},{x:a.x+Math.sin(ha)*length*.55+normal.x*branch.offset,z:a.z+Math.cos(ha)*length*.55+normal.z*branch.offset},{x:b.x-Math.sin(hb)*length*.55+normal.x*branch.offset,z:b.z-Math.cos(hb)*length*.55+normal.z*branch.offset},{x:b.x-Math.sin(hb)*length*.18,z:b.z-Math.cos(hb)*length*.18},b],samples=[],distances=[0],coefficients=[1,5,10,10,5,1];for(let i=0;i<=256;i++){const u=i/256,p={x:0,z:0};for(let j=0;j<6;j++){const f=coefficients[j]*u**j*(1-u)**(5-j);p.x+=controls[j].x*f;p.z+=controls[j].z*f;}if(i)distances.push(distances[i-1]+Math.hypot(p.x-samples[i-1].x,p.z-samples[i-1].z));samples.push(p);}const total=distances.at(-1);const points=Array.from({length:65},(_,i)=>{const distance=total*i/64;let index=0;while(index<255&&distances[index+1]<distance)index++;const f=(distance-distances[index])/(distances[index+1]-distances[index]);return {x:samples[index].x+(samples[index+1].x-samples[index].x)*f,z:samples[index].z+(samples[index+1].z-samples[index].z)*f,t:branch.start+(branch.end-branch.start)*i/64};});return {...branch,length:total,points};});
+ const extent=[...data.TRACK,...data.BRANCHES.flatMap(b=>b.points)];data.bounds={minX:Math.min(...extent.map(p=>p.x)),maxX:Math.max(...extent.map(p=>p.x)),minZ:Math.min(...extent.map(p=>p.z)),maxZ:Math.max(...extent.map(p=>p.z))};cache.set(config.id,data);
+ for(const gate of data.GATES)gate.alternatives=data.BRANCHES.filter(b=>gate.t>b.start&&gate.t<b.end).map(b=>({...routePoint(gate.t,config.id,b.id),t:gate.t,heading:routeHeading(gate.t,config.id,b.id),width:b.width,branchId:b.id}));
  // One deterministic set is rendered and collided on desktop, mobile and the server.
  let seed=Array.from(config.id).reduce((n,c)=>(n*31+c.charCodeAt(0))>>>0,719);const rnd=()=>{seed=(seed*1664525+1013904223)>>>0;return seed/4294967296;};
  data.SCENERY_ROCKS=[];
  for(let i=0;i<260;i++){const x=(rnd()-.5)*420,z=(rnd()-.5)*320,size=.7+rnd()*2.1,radius=size*.9,rotation=[0,rnd()*Math.PI*2,0];if(riverAt(x,z,config.id)||nearestTrack(x,z,config.id).distance<config.width/2+2+radius)continue;const o={id:data.OBSTACLES.length,type:'rock',scenery:true,x,z,radius,height:size*1.05,baseOffset:size*.25,scale:[size,size*.65,size*.8],rotation};data.SCENERY_ROCKS.push(o);data.OBSTACLES.push(o);}
  return data;
 }
-export function nearestTrack(x,z,id=DEFAULT_TRACK){const points=trackData(id).TRACK;let d=Infinity,index=0,tx=0,tz=0;
+export function nearestTrack(x,z,id=DEFAULT_TRACK,preferredBranchId=null){const points=trackData(id).TRACK;let d=Infinity,index=0,tx=0,tz=0;
  let progress=0;for(let i=0;i<points.length;i++){const a=points[i],b=points[(i+1)%points.length],dx=b.x-a.x,dz=b.z-a.z,f=Math.max(0,Math.min(1,((x-a.x)*dx+(z-a.z)*dz)/(dx*dx+dz*dz))),px=a.x+f*dx,pz=a.z+f*dz,ds=(px-x)**2+(pz-z)**2;if(ds<d){d=ds;index=i;progress=f;tx=px;tz=pz;}}
- return {distance:Math.sqrt(d),t:(index+progress)/points.length,x:tx,z:tz};
+ let preferred=null;let t=(index+progress)/points.length,branchId=null,width=trackById(id).width,branchSurface=null;
+ for(const branch of trackData(id).BRANCHES)for(let i=0;i<branch.points.length-1;i++){const a=branch.points[i],b=branch.points[i+1],dx=b.x-a.x,dz=b.z-a.z,f=Math.max(0,Math.min(1,((x-a.x)*dx+(z-a.z)*dz)/(dx*dx+dz*dz))),px=a.x+f*dx,pz=a.z+f*dz,ds=(px-x)**2+(pz-z)**2;if(branch.id===preferredBranchId&&(!preferred||ds<preferred.d))preferred={d:ds,x:px,z:pz,t:a.t+(b.t-a.t)*f,branchId:branch.id,width:branch.width,branchSurface:branch.surface,start:branch.start,end:branch.end};if(ds<d&&(ds<=branch.width*branch.width/4||d>width*width/4)){d=ds;tx=px;tz=pz;t=a.t+(b.t-a.t)*f;branchId=branch.id;width=branch.width;branchSurface=branch.surface;}}
+ if(preferred&&preferred.t>preferred.start+.0003&&preferred.t<preferred.end-.0003&&preferred.d<(preferred.width/2+3)**2&&(preferred.d<=preferred.width*preferred.width/4||d>width*width/4))return {distance:Math.sqrt(preferred.d),t:preferred.t,x:preferred.x,z:preferred.z,branchId:preferred.branchId,width:preferred.width,branchSurface:preferred.branchSurface};return {distance:Math.sqrt(d),t,x:tx,z:tz,branchId,width,branchSurface};
 }
+export function routePoint(t,id=DEFAULT_TRACK,branchId=null){const branch=branchId&&trackData(id).BRANCHES.find(b=>b.id===branchId);if(!branch||t<branch.start||t>branch.end)return trackPoint(t,id);const u=(t-branch.start)/(branch.end-branch.start)*(branch.points.length-1),i=Math.min(branch.points.length-2,Math.floor(u)),f=u-i,a=branch.points[i],b=branch.points[i+1];return {x:a.x+(b.x-a.x)*f,z:a.z+(b.z-a.z)*f};}
+export function routeScale(id,branchId){const b=branchId&&trackData(id).BRANCHES.find(b=>b.id===branchId);return b?b.length/(trackData(id).length*(b.end-b.start)):1;}
+export function routeHeading(t,id=DEFAULT_TRACK,branchId=null){const a=routePoint(t,id,branchId),b=routePoint(t+.0001,id,branchId);return Math.atan2(b.x-a.x,b.z-a.z);}
 export function routeGuidance(state){
- const id=state.trackId||DEFAULT_TRACK,track=trackData(id),nearest=nearestTrack(state.x,state.z,id),offRoad=nearest.distance>track.width/2+.6;
- const wrongWay=!offRoad&&Math.cos(state.yaw-trackHeading(nearest.t,id))<-.45;
- const ahead=offRoad?4:Math.max(8,Math.min(22,6+state.speed*.7)),target=trackPoint(nearest.t+ahead/track.length,id);
+ const id=state.trackId||DEFAULT_TRACK,track=trackData(id),nearest=nearestTrack(state.x,state.z,id,state.branchId),offRoad=nearest.distance>nearest.width/2+.6;
+ const wrongWay=!offRoad&&Math.cos(state.yaw-routeHeading(nearest.t,id,nearest.branchId))<-.45;
+ const ahead=offRoad?4:Math.max(8,Math.min(22,6+state.speed*.7)),target=routePoint(nearest.t+ahead/(track.length*routeScale(id,nearest.branchId)),id,nearest.branchId);
  const angle=Math.atan2(Math.sin(Math.atan2(target.x-state.x,target.z-state.z)-state.yaw),Math.cos(Math.atan2(target.x-state.x,target.z-state.z)-state.yaw));
- return {offRoad,wrongWay,angle,distance:Math.max(0,nearest.distance-track.width/2),target};
+ return {offRoad,wrongWay,angle,distance:Math.max(0,nearest.distance-nearest.width/2),target,branchId:nearest.branchId};
 }
 export function featureCoords(feature,x,z){const dx=x-feature.x,dz=z-feature.z;return {cross:dx*Math.cos(feature.heading)-dz*Math.sin(feature.heading),along:dx*Math.sin(feature.heading)+dz*Math.cos(feature.heading)};}
 export function rampAt(x,z,id=DEFAULT_TRACK){for(const ramp of trackData(id).RAMPS){const q=featureCoords(ramp,x,z);if(Math.abs(q.cross)<ramp.width/2&&q.along>=-ramp.length/2&&q.along<=ramp.length/2)return {...ramp,...q};}return null;}
@@ -58,7 +71,7 @@ export function riverAt(x,z,id=DEFAULT_TRACK){return trackData(id).RIVERS.find(r
 export function naturalHeight(x,z,id=DEFAULT_TRACK){return trackById(id).relief*(1.3*Math.sin(x*.026)+2.3*Math.cos(z*.032)+1.1*Math.sin((x+z)*.043));}
 export function baseHeight(x,z,id=DEFAULT_TRACK){const river=riverAt(x,z,id);if(!river)return naturalHeight(x,z,id);const q=featureCoords(river,x,z),bank=Math.min(1,Math.abs(q.along)/(river.width/2));return naturalHeight(x,z,id)-.38*(1-bank**6);}
 export function groundHeight(x,z,id=DEFAULT_TRACK){const ramp=rampAt(x,z,id);return baseHeight(x,z,id)+(ramp?(ramp.along+ramp.length/2)/ramp.length*ramp.height:0);}
-export function surfaceAt(x,z,weather='clear',id=DEFAULT_TRACK){const n=nearestTrack(x,z,id),track=trackById(id),inside=segments=>segments.some(([a,b])=>n.t>a&&n.t<b),name=rampAt(x,z,id)?'ramp':riverAt(x,z,id)?'water':n.distance>track.width/2?(weather==='snow'?'snow':'grass'):inside(track.sand)?'sand':inside(track.mud)?'mud':weather==='snow'?'snow':'dirt';return {...n,name,offRoad:n.distance>track.width/2};}
+export function surfaceAt(x,z,weather='clear',id=DEFAULT_TRACK,preferredBranchId=null){const n=nearestTrack(x,z,id,preferredBranchId),track=trackById(id),inside=segments=>segments.some(([a,b])=>n.t>a&&n.t<b),name=rampAt(x,z,id)?'ramp':riverAt(x,z,id)?'water':n.distance>n.width/2?(weather==='snow'?'snow':'grass'):weather==='snow'?'snow':n.branchSurface|| (inside(track.sand)?'sand':inside(track.mud)?'mud':'dirt');return {...n,name,offRoad:n.distance>n.width/2};}
 // Default course exports for tools; historical results are kept separately.
 export const {TRACK,GATES,RAMPS,RIVERS,OBSTACLES,ORCS}=trackData();
 export const TRACK_WIDTH=trackById(DEFAULT_TRACK).width;

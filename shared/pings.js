@@ -1,0 +1,3 @@
+import {nearestTrack,routePoint} from './tracks.js';
+export const PING_LABELS={help:'Нужна помощь',danger:'Опасность здесь',route:'Едем сюда',ready:'Готов к старту'};
+export function addPing(room,s,type,time){if(!Object.hasOwn(PING_LABELS,type)||s.health===0||s.finished||time<(s.pingReady||0))return false;const near=nearestTrack(s.x,s.z,s.trackId,s.branchId),point=type==='route'?routePoint(near.t+.03,s.trackId,near.branchId):s;room.pings||=[];room.nextPing=(room.nextPing||0)+1;room.pings.push({id:room.nextPing,actorId:s.id,type,x:point.x,z:point.z,expires:time+5});room.pings=room.pings.filter(p=>p.expires>time).slice(-12);s.pingReady=time+2;return true;}

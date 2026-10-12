@@ -1,3 +1,4 @@
+import {installProgressStore} from './progress-store.js';
 import {SEASON,medalFor,rankChampionship} from '../shared/championship.js';
 import { DatabaseSync } from 'node:sqlite';
 import { randomBytes, scrypt as scryptCb, timingSafeEqual, createHash } from 'node:crypto';
@@ -22,10 +23,12 @@ export function createStore(path) {
   for(const [name,definition]of Object.entries({track:"TEXT NOT NULL DEFAULT 'rift'",revision:'INTEGER NOT NULL DEFAULT 1',physics:'INTEGER NOT NULL DEFAULT 5',mode:"TEXT NOT NULL DEFAULT 'legacy'",weather:"TEXT NOT NULL DEFAULT 'clear'",score:'INTEGER NOT NULL DEFAULT 0'}))if(!columns.has(name))db.exec(`ALTER TABLE laps ADD COLUMN ${name} ${definition}`);
   db.exec('CREATE INDEX IF NOT EXISTS lap_context ON laps(track,revision,physics,mode,weather,bike,seconds)');
   db.exec(`CREATE TABLE IF NOT EXISTS championship (season TEXT NOT NULL,user_id INTEGER NOT NULL REFERENCES users(id),event TEXT NOT NULL,bike TEXT NOT NULL,seconds REAL NOT NULL,points INTEGER NOT NULL,medal TEXT NOT NULL,ratio REAL NOT NULL,PRIMARY KEY(season,user_id,event));`);
-  const publicUser=u=>({id:u.id,nickname:u.nickname});
+  if(!db.prepare('PRAGMA table_info(users)').all().some(c=>c.name==='guest'))db.exec('ALTER TABLE users ADD COLUMN guest INTEGER NOT NULL DEFAULT 0');
+  const progress=installProgressStore(db);
+  const publicUser=u=>({id:u.id,nickname:u.nickname,...(u.guest?{guest:true}:{})});
   function issueSession(user){db.prepare('DELETE FROM sessions WHERE user_id=? AND token NOT IN (SELECT token FROM sessions WHERE user_id=? ORDER BY expires DESC LIMIT 4)').run(user.id,user.id);const token=randomBytes(32).toString('hex');db.prepare('INSERT INTO sessions VALUES(?,?,?)').run(digest(token),user.id,Date.now()+7*86400000);return {user:publicUser(user),token};}
   return {
-    db,
+    db,...progress,
     async register(nickname,password) {
       if(typeof nickname!=='string'||!/^[\p{L}\p{N}_-]{3,20}$/u.test(nickname))throw new Error('Ник: 3–20 букв, цифр, _ или -.');
       if(typeof password!=='string'||password.length<10||password.length>128)throw new Error('Пароль: 10–128 символов.');
@@ -33,6 +36,7 @@ export function createStore(path) {
       let id;try{id=db.prepare('INSERT INTO users(nickname,password) VALUES(?,?)').run(nickname,`${salt}:${hash}`).lastInsertRowid;}catch(e){if(e.code?.startsWith('ERR_SQLITE'))throw new Error('Этот ник уже занят.');throw e;}
       return issueSession({id:Number(id),nickname});
     },
+    async guest(nickname){if(typeof nickname!=='string'||!/^[\p{L}\p{N}_-]{3,12}$/u.test(nickname))throw new Error('Гостевой ник: 3–12 букв или цифр.');const result=await this.register(nickname+'-'+randomBytes(3).toString('hex'),randomBytes(32).toString('hex'));db.prepare('UPDATE users SET guest=1 WHERE id=?').run(result.user.id);result.user.guest=true;return result;},
     async login(nickname,password) {
       if(typeof nickname!=='string'||typeof password!=='string'||nickname.length>20||password.length>128)throw new Error('Неверный ник или пароль.');
       const u=db.prepare('SELECT * FROM users WHERE nickname=?').get(nickname),parts=(u?.password||'00000000000000000000000000000000:'+ '00'.repeat(64)).split(':');
@@ -40,7 +44,7 @@ export function createStore(path) {
       if(!timingSafeEqual(attempt,Buffer.from(parts[1],'hex'))||!u)throw new Error('Неверный ник или пароль.');
       return issueSession(u);
     },
-    session(token) {if(typeof token!=='string'||token.length!==64)return null;const u=db.prepare('SELECT u.id,u.nickname FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token=? AND s.expires>?').get(digest(token),Date.now());return u?publicUser(u):null;},
+    session(token) {if(typeof token!=='string'||token.length!==64)return null;const u=db.prepare('SELECT u.id,u.nickname,u.guest FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token=? AND s.expires>?').get(digest(token),Date.now());return u?publicUser(u):null;},
     logout(token){if(token)db.prepare('DELETE FROM sessions WHERE token=?').run(digest(token));},
     record(userId,bike,seconds,c={}){const v=context(c);db.prepare('INSERT INTO laps(user_id,bike,seconds,track,revision,physics,mode,weather,score) VALUES(?,?,?,?,?,?,?,?,?)').run(userId,bike,seconds,...values(v),Math.max(0,Math.floor(c.score||0)));},
     leaderboard(bike,c={}){const v=context(c);return db.prepare(`SELECT u.nickname,l.bike,MIN(l.seconds) seconds,COUNT(*) laps,MAX(l.score) score FROM laps l JOIN users u ON u.id=l.user_id WHERE l.track=? AND l.revision=? AND l.physics=? AND l.mode=? AND l.weather=? ${bike?'AND l.bike=?':''} GROUP BY l.user_id,l.bike ORDER BY seconds ASC LIMIT 50`).all(...values(v),...(bike?[bike]:[]));},

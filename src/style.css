@@ -63,3 +63,18 @@ button{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-web
 @media(max-width:640px),(pointer:coarse){#hud:has(#damage-feedback:not([hidden])) #offroad-feedback,#hud:has(#damage-feedback:not([hidden])) #pursuit-warning,#hud:has(#offroad-feedback:not([hidden])) #pursuit-warning{visibility:hidden}}
 
 .asset-credits{font-size:10px;color:#a5b5a4;margin-top:12px;line-height:1.7}.asset-credits summary{cursor:pointer;padding:8px 0}.asset-credits a{text-decoration:underline}.asset-credits p{margin:8px 0}
+
+.camera-help{font-size:12px;line-height:1.55;color:var(--muted)}#settings-dialog{max-height:88svh;overflow:auto}body.racing #game-canvas{cursor:grab}body.racing #game-canvas:active{cursor:grabbing}
+
+.practice-extras{display:flex;gap:16px;align-items:center;margin:12px 0}.practice-extras button{text-align:left}.replay-row{display:grid;grid-template-columns:1fr auto auto;gap:8px;align-items:center;border-bottom:1px solid var(--line);padding:14px 0}.replay-row strong{font-size:12px}.replay-row button{padding:10px;font-size:11px}.ghost-status{display:block;padding:5px 10px;font-size:10px;background:#142a27bf;color:#e4b797;border-radius:6px}.ghost-status.ghost-ahead{color:#91dccb}body.replay-playback .touch-controls{display:none}@media(max-width:640px){.replay-row{grid-template-columns:1fr 1fr}.replay-row strong{grid-column:1/-1}.ghost-status{font-size:9px;padding:3px 8px}}
+
+.adventure-objective{display:block;max-width:300px;padding:6px 9px;border-radius:6px;background:#2a2720cc;color:#edcc8d;font-size:10px}.adventure-actions{position:absolute;right:20px;top:105px;display:flex;gap:6px;pointer-events:auto}.adventure-actions button{background:#223829dd;color:#e9d298;border:1px solid #d5b16a66;border-radius:9px;padding:12px;touch-action:manipulation}@media(max-width:640px){.adventure-actions{right:10px;top:103px;flex-direction:column;gap:4px}.adventure-actions button{min-height:42px;padding:8px;font-size:10px}.adventure-actions kbd{display:none}.adventure-objective{max-width:245px;font-size:9px;padding:4px 8px}}
+
+.expansion-dialog{max-height:88svh;overflow:auto}.expansion-dialog>button:not(.dialog-close){margin:6px 6px 6px 0;min-height:44px}.expansion-dialog input,.expansion-dialog select{width:100%;margin:8px 0}.result-row,.badge-row{display:grid;gap:6px;padding:14px 0;border-bottom:1px solid var(--line)}.result-row small,.badge-row small{color:var(--muted);line-height:1.5}.result-row button,.badge-row button{justify-self:start;min-height:44px}#practice-setup{width:100%}#guest-enter{margin-top:12px}#result-card-open{margin-top:10px}.replay-row{overflow-wrap:anywhere}
+@media(max-width:640px),(pointer:coarse){#hud.menu-open .race-controls{max-height:calc(100svh - 140px);overflow:auto}.top-actions{flex-wrap:wrap}}
+
+.invite-qr{display:block;width:220px;height:220px;max-width:100%;margin:16px auto;border-radius:10px}.expansion-dialog .footnote{line-height:1.5}
+
+@media(max-width:640px) and (orientation:portrait){.adventure-actions{top:140px}}
+
+.adventure-actions button{min-height:44px}

@@ -96,9 +96,9 @@ function optimize(group){
 
 export { mat,add,box,ellipsoid,tube,profile,shell,curvedTube,bolt,fender,limb,riderModel,optimize };
 
-// Procedural materials are shared; loaded GLTF materials belong only to that model.
+// Loaded instances own materials; cached templates retain shared geometry/textures.
 export function disposeBike(root){
  if(!root)return;root.removeFromParent();const geometries=new Set(),materials=new Set(),textures=new Set();
  root.traverse(o=>{if(o.geometry)geometries.add(o.geometry);if(root.userData.ownedMaterials)for(const m of Array.isArray(o.material)?o.material:[o.material])if(m){materials.add(m);for(const value of Object.values(m))if(value?.isTexture)textures.add(value);}});
- for(const g of geometries)g.dispose();for(const m of materials)m.dispose();for(const t of textures)t.dispose();
+ if(!root.userData.releaseAssets){for(const g of geometries)g.dispose();for(const t of textures)t.dispose();}for(const m of materials)m.dispose();root.userData.releaseAssets?.();
 }

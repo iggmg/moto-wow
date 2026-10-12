@@ -1,0 +1,10 @@
+import * as T from 'three';
+import {worldObstacles} from '../shared/world-events.js';
+import {groundHeight} from '../shared/game.js';
+function make(type){const root=new T.Group(),wood=new T.MeshStandardMaterial({color:0x69503b,roughness:.9}),dark=new T.MeshStandardMaterial({color:0x302d26,roughness:.85}),bone=new T.MeshStandardMaterial({color:0xc9c7ae,roughness:.7}),add=(g,m,x,y,z)=>{const o=new T.Mesh(g,m);o.position.set(x,y,z);o.castShadow=true;root.add(o);return o;};
+ if(type==='boar'){const body=add(new T.SphereGeometry(1,12,8),dark,0,.55,0);body.scale.set(.4,.4,.65);const head=add(new T.SphereGeometry(1,10,8),wood,0,.6,.5);head.scale.set(.3,.3,.32);for(const side of [-1,1]){const tusk=add(new T.ConeGeometry(.045,.25,6),bone,side*.2,.43,.72);tusk.rotation.x=-.6;for(const z of [-.35,.35])add(new T.CylinderGeometry(.055,.08,.35,6),dark,side*.26,.2,z);}}
+ else if(type==='gate'){add(new T.CylinderGeometry(2.1,2.1,1.5,10),wood,0,.75,0);for(let i=0;i<8;i++){const a=i/8*Math.PI*2;add(new T.ConeGeometry(.12,.5,6),bone,Math.cos(a)*1.7,1.65,Math.sin(a)*1.7);}}
+ else {add(new T.BoxGeometry(2.5,1.1,1.4),wood,0,1,0);for(const side of [-1,1])for(const z of [-.5,.5]){const wheel=add(new T.TorusGeometry(.36,.09,6,16),dark,side*1.35,.42,z);wheel.rotation.y=Math.PI/2;}for(const x of [-.7,0,.7])add(new T.CylinderGeometry(.17,.17,1.9,8),wood,x,1.6,0);}
+ return root;
+}
+export function createWorldEventView(scene,trackId){const root=new T.Group(),models=new Map();scene.add(root);return {root,update(events,time){const objects=worldObstacles(events,time),ids=new Set(objects.map(o=>o.id));for(const o of objects){let model=models.get(o.id);if(!model){model=make(o.type);models.set(o.id,model);root.add(model);}model.position.set(o.x,groundHeight(o.x,o.z,trackId),o.z);model.rotation.y=o.vx||o.vz?Math.atan2(o.vx,o.vz):0;}for(const [id,model]of models)if(!ids.has(id)){model.removeFromParent();const mats=new Set();model.traverse(o=>{if(o.geometry)o.geometry.dispose();if(o.material)mats.add(o.material);});for(const m of mats)m.dispose();models.delete(id);}},dispose(){this.update(null,0);root.removeFromParent();}};}

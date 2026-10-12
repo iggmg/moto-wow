@@ -50,3 +50,6 @@ Himalayan 411: заводской Granite Black, круглая фара, вет
 ## Управляемость 0.4.4
 
 Пул следов шин src/tyre-marks.js и синтезированный звук скольжения src/audio.js оригинальные, MIT. Новые внешние ассеты не добавлены. Наклон и клевок — визуальная аркадная имитация, а не симуляция подвески.
+
+## QR invitations
+QR images are generated locally using [node-qrcode](https://github.com/soldair/node-qrcode), version 1.5.4, MIT license. Only the game room/result URL is encoded; no credentials are included.
