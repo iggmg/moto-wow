@@ -128,7 +128,7 @@ export class Race {
     this.visualSettings={...this.visualSettings,...changes};this.cameraMode=RIDING_CAMERAS[this.visualSettings.camera]?this.visualSettings.camera:'chase';this.visualSettings.camera=this.cameraMode;
     const quality=QUALITY_PROFILES[this.visualSettings.quality]||QUALITY_PROFILES.auto;this.renderer.setPixelRatio(Math.min(devicePixelRatio,quality.ratio));this.renderer.shadowMap.enabled=quality.shadows;
     safeStorage.setItem('moto-visual',JSON.stringify(this.visualSettings));safeStorage.setItem('moto-camera',this.cameraMode);this.lowFrames=0;this.autoQuality=null;this.resize();
-    $('camera-toggle').textContent=this.cameraMode==='first'?'Камера: шлем':this.cameraMode==='sport'?'Камера: спорт':this.cameraMode==='orbit'?'Камера: обзор':this.cameraMode==='map'?'Камера: сверху':'Камера: байк';
+    $('camera-toggle').textContent=this.cameraMode==='first'?'Камера: шлем':this.cameraMode==='sport'?'Камера: спорт':this.cameraMode==='orbit'?'Камера: обзор':this.cameraMode==='map'?'Камера: сверху':'Камера: сзади';
     if(this.running&&!this.stunt)this.applyCamera(true);
   }
   setMenu(open){$('hud').classList.toggle('menu-open',open);$('race-menu-toggle').setAttribute('aria-expanded',String(open));$('race-menu-toggle').setAttribute('aria-label',open?'Закрыть меню заезда':'Открыть меню заезда');$('race-menu-toggle').textContent=open?'×':'☰';this.keys.clear();this.touchControls?.clear();}
